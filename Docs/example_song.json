@@ -1,0 +1,25 @@
+{
+  "id": "example_song",
+  "title": "Example Song",
+  "artist": "Your Name",
+  "audio": "Songs/example_song",
+  "bpm": 120,
+  "offset": 0.0,
+  "timeUnit": "beat",
+  "charts": [
+    {
+      "difficulty": "EASY",
+      "level": 1,
+      "notes": [
+        { "time": 0, "lane": 1 },
+        { "time": 1, "lane": 2 },
+        { "time": 2, "lane": 1 },
+        { "time": 3, "lane": 2 },
+        { "time": 4, "lane": 0, "duration": 2 },
+        { "time": 6, "lane": 3, "duration": 2 },
+        { "time": 8, "lane": 1 },
+        { "time": 8, "lane": 2 }
+      ]
+    }
+  ]
+}
