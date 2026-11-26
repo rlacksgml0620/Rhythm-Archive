@@ -648,7 +648,9 @@ function loadSkinColors(skin) {
   J_COLORS.splice(0, 5, ...(gray ? [COL.fg, mid[1], mid[2], mid[3], mid[4]] : [COL.fg, COL.accent, COL.accent2, COL.dim, COL.mute]));
 }
 loadSkinColors("mono");
-const START_LEAD_IN = 3.0;
+const START_LEAD_IN = 5.0;
+// The 3-2-1 countdown ends this many seconds before the first beat, so there is time to get ready.
+const COUNT_GAP = 2.0;
 const RESUME_REWIND = 2.0;
 
 // ============================================================ storage (per-device)
@@ -3254,7 +3256,7 @@ function drawHud(t) {
     }
   }
 
-  if (t < -0.2 && game.state === "playing" && fxOf().banner) {
+  if (t < -COUNT_GAP && game.state === "playing" && fxOf().banner) {
     // boss intro banner
     const blink = Math.floor(performance.now() / 260) % 2 === 0;
     g.textBaseline = "middle";
@@ -3266,11 +3268,12 @@ function drawHud(t) {
     g.font = `400 12px ${C("--font-mono")}`;
     g.fillText(fxOf().banner[1], w / 2, h * 0.27 + 34);
   }
-  if (t < -0.2 && game.state === "playing") {
+  const cd = -t - COUNT_GAP; // seconds left on the countdown
+  if (cd > -0.5 && game.state === "playing") {
     g.textBaseline = "middle";
-    g.fillStyle = COL.fg;
+    g.fillStyle = cd > 0 ? COL.fg : withAlpha(COL.fg, Math.max(0, 1 + cd / 0.5));
     g.font = `900 88px ${C("--font-display")}`;
-    g.fillText(String(Math.ceil(-t)), w / 2, h * 0.45);
+    g.fillText(cd > 0 ? String(Math.ceil(cd)) : "GO", w / 2, h * 0.45);
   }
 
   if (matchMedia("(pointer: fine)").matches) {
