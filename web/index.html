@@ -35,8 +35,50 @@ body { margin: 0; font: 14px system-ui, -apple-system, sans-serif; }
   --ink: #000000;
   --font-display: "Orbitron", "Eurostile", "Arial Black", sans-serif;
   --font-mono: "Share Tech Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --accent: #f2f2f2;
+  --accent2: #b8b8b8;
+  --sel: var(--fg);
+  --sel-ink: var(--ink);
+  --flash: var(--fg);
+  --glow: transparent;
   color-scheme: dark;
 }
+/* Boss skins (unlocked by achievements). VOID VIOLET: ARCHIVE BREAKER. CRIMSON ZERO: ZERO ERRORS. */
+:root[data-skin="violet"] {
+  --bg: #07020f; --panel: #11071f; --field: #0b0316; --line: #2b1747; --line-strong: #6a43a3;
+  --fg: #f1e9ff; --dim: #a893d0; --mute: #56427c; --ink: #07020f;
+  --accent: #b46bff; --accent2: #ff5fd8; --sel: #b46bff; --sel-ink: #07020f; --flash: #dcc0ff;
+  --glow: rgba(180, 107, 255, 0.55);
+}
+:root[data-skin="crimson"] {
+  --bg: #0b0203; --panel: #180507; --field: #110304; --line: #3d1116; --line-strong: #8a2a31;
+  --fg: #ffecea; --dim: #d8938f; --mute: #6f2d30; --ink: #0b0203;
+  --accent: #ff2b3e; --accent2: #ff8a3d; --sel: #ff2b3e; --sel-ink: #0b0203; --flash: #ff6470;
+  --glow: rgba(255, 43, 62, 0.55);
+}
+:root[data-skin] .home-title h1, :root[data-skin] .rank, :root[data-skin] .finale-text, :root[data-skin] .big-title { text-shadow: 0 0 26px var(--glow), 0 0 2px var(--glow); }
+:root[data-skin] .btn.primary, :root[data-skin] .rank.tier-s { box-shadow: 0 0 24px var(--glow); }
+:root[data-skin] .song[aria-pressed="true"], :root[data-skin] .diff[aria-pressed="true"] { box-shadow: 0 0 18px var(--glow); }
+:root[data-skin="violet"] .screen.solid {
+  background-image: radial-gradient(120% 55% at 50% -12%, rgba(180, 107, 255, 0.22), transparent 62%),
+    radial-gradient(90% 40% at 50% 112%, rgba(255, 95, 216, 0.12), transparent 70%);
+}
+:root[data-skin="crimson"] .screen.solid {
+  background-image: radial-gradient(120% 55% at 50% 112%, rgba(255, 43, 62, 0.24), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px);
+}
+:root[data-skin="crimson"] .home-title h1 { animation: alarm 2.4s ease-in-out infinite; }
+@keyframes alarm { 0%, 100% { text-shadow: 0 0 18px var(--glow); } 50% { text-shadow: 0 0 42px var(--glow), 0 0 4px var(--accent); } }
+.skin-row { width: 100%; max-width: 720px; margin: 14px auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.skin { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); background: var(--panel); min-width: 0; }
+.skin .sw { display: flex; height: 26px; border: 1px solid var(--line-strong); }
+.skin .sw i { flex: 1; }
+.skin .nm { font-family: var(--font-display); font-weight: 900; font-size: 11px; letter-spacing: 0.08em; overflow-wrap: anywhere; }
+.skin .rq { font-size: 10px; color: var(--dim); letter-spacing: 0.04em; line-height: 1.4; min-height: 28px; }
+.skin button { height: 34px; border: 1px solid var(--line-strong); font-family: var(--font-display); font-weight: 700; font-size: 10px; letter-spacing: 0.14em; }
+.skin button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
+.skin.locked .sw { opacity: 0.35; filter: grayscale(1); }
+.achv .rw { grid-column: 2 / -1; font-size: 11px; letter-spacing: 0.08em; color: var(--accent); }
 html, body { height: 100%; }
 body {
   background: var(--bg);
@@ -106,7 +148,7 @@ button:disabled { opacity: 0.3; cursor: default; }
   border: 1px solid var(--line);
   text-align: left;
 }
-.song[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.song[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
 .song .disc {
   flex: none; width: 46px; height: 46px;
   border: 1px solid currentColor;
@@ -125,7 +167,7 @@ button:disabled { opacity: 0.3; cursor: default; }
 }
 .diff .n { font-size: 10px; letter-spacing: 0.14em; }
 .diff .lv { font-family: var(--font-display); font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
-.diff[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.diff[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
 .best { color: var(--dim); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; font-variant-numeric: tabular-nums; min-height: 18px; }
 
 .settings { display: grid; gap: 8px; }
@@ -146,9 +188,9 @@ button:disabled { opacity: 0.3; cursor: default; }
 .btn:active { background: var(--fg); color: var(--ink); }
 .btn.primary {
   height: 64px;
-  background: var(--fg);
-  color: var(--ink);
-  border-color: var(--fg);
+  background: var(--sel);
+  color: var(--sel-ink);
+  border-color: var(--sel);
   font-weight: 900;
   font-size: 22px;
   letter-spacing: 0.3em;
@@ -204,9 +246,9 @@ button:disabled { opacity: 0.3; cursor: default; }
   margin: 0; font-family: var(--font-display); font-weight: 900; line-height: 0.96; letter-spacing: 0.04em;
   font-size: clamp(40px, 12.5vw, 128px); text-wrap: balance;
 }
-.home-title .rule { width: min(72%, 460px); height: 2px; background: var(--fg); }
+.home-title .rule { width: min(72%, 460px); height: 2px; background: var(--sel); }
 .home-title p { margin: 0; font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); }
-.cursor { display: inline-block; width: 0.6em; height: 1em; background: var(--fg); vertical-align: -0.15em; margin-left: 4px; animation: blink 1s steps(1) infinite; }
+.cursor { display: inline-block; width: 0.6em; height: 1em; background: var(--sel); vertical-align: -0.15em; margin-left: 4px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .home-actions { width: 100%; max-width: 360px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
 
@@ -262,10 +304,10 @@ button:disabled { opacity: 0.3; cursor: default; }
 .achv .bar i { display: block; height: 100%; background: var(--dim); }
 .achv:not(.on) .nm { color: var(--dim); }
 .achv.on { border-color: var(--line-strong); }
-.achv.on .ico { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.achv.on .ico { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
 .achv.on .pg { color: var(--fg); }
 #toasts { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(calc(100% - 32px), 420px); display: flex; flex-direction: column; gap: 6px; z-index: 30; pointer-events: none; }
-.toast { background: var(--fg); color: var(--ink); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; animation: toast-in 0.3s ease-out both, toast-out 0.35s ease-in 2.6s forwards; }
+.toast { background: var(--sel); color: var(--sel-ink); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; animation: toast-in 0.3s ease-out both, toast-out 0.35s ease-in 2.6s forwards; }
 .toast small { font-size: 10px; letter-spacing: 0.24em; }
 .toast b { font-family: var(--font-display); font-weight: 900; font-size: 14px; letter-spacing: 0.1em; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
@@ -292,26 +334,26 @@ input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: v
 input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; }
 .toggle { display: flex; gap: 6px; }
 .toggle button { height: 40px; min-width: 56px; padding: 0 10px; border: 1px solid var(--line-strong); font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: 0.12em; }
-.toggle button[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.toggle button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
 .toggle button.test { min-width: 0; color: var(--dim); }
 
 /* ---- finale (after the last note) ---- */
 .finale { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.62);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .finale-inner { width: 100%; max-width: 520px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.finale-line { height: 2px; width: 0; background: var(--fg); animation: f-line 0.5s 0.05s cubic-bezier(.2,.8,.2,1) forwards; }
+.finale-line { height: 2px; width: 0; background: var(--sel); animation: f-line 0.5s 0.05s cubic-bezier(.2,.8,.2,1) forwards; }
 .finale-text {
   font-family: var(--font-display); font-weight: 900; font-size: min(8.4vw, 58px); letter-spacing: 0.08em; white-space: nowrap;
   padding: 0.18em 0.4em; clip-path: inset(0 50% 0 50%); animation: f-wipe 0.35s 0.25s cubic-bezier(.2,.8,.2,1) forwards;
 }
-.finale.fc .finale-text, .finale.ap .finale-text { background: var(--fg); color: var(--ink); }
+.finale.fc .finale-text, .finale.ap .finale-text { background: var(--sel); color: var(--sel-ink); }
 .finale.ap .finale-text { animation: f-wipe 0.35s 0.3s cubic-bezier(.2,.8,.2,1) forwards, f-blink 0.16s 0.75s 5 steps(1); }
 .finale-sub { font-size: 12px; letter-spacing: 0.3em; color: var(--dim); text-align: center; opacity: 0; animation: f-fade 0.3s 0.65s forwards; }
 @keyframes f-line { to { width: 100%; } }
 @keyframes f-wipe { to { clip-path: inset(0 0 0 0); } }
 @keyframes f-blink { 50% { background: var(--ink); color: var(--fg); outline: 2px solid var(--fg); } }
 @keyframes f-fade { to { opacity: 1; } }
-#flash { position: absolute; inset: 0; background: var(--fg); opacity: 0; pointer-events: none; z-index: 5; }
+#flash { position: absolute; inset: 0; background: var(--flash); opacity: 0; pointer-events: none; z-index: 5; }
 #flash.on { animation: flash 0.5s ease-out; }
 @keyframes flash { from { opacity: 0.9; } to { opacity: 0; } }
 
@@ -321,9 +363,9 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
 .rank { align-self: center; padding: 0 0.14em; }
 .rank.pending { opacity: 0; }
 .rank.tier-a { outline: 3px solid var(--fg); outline-offset: -3px; }
-.rank.tier-s { background: var(--fg); color: var(--ink); }
-.rank.tier-ss { box-shadow: 0 0 0 5px var(--bg), 0 0 0 8px var(--fg); margin-block: 10px; }
-.rank.tier-sss { box-shadow: 0 0 0 5px var(--bg), 0 0 0 8px var(--fg), 0 0 0 13px var(--bg), 0 0 0 16px var(--fg); margin-block: 18px; }
+.rank.tier-s { background: var(--sel); color: var(--sel-ink); }
+.rank.tier-ss { box-shadow: 0 0 0 5px var(--bg), 0 0 0 8px var(--sel); margin-block: 10px; }
+.rank.tier-sss { box-shadow: 0 0 0 5px var(--bg), 0 0 0 8px var(--sel), 0 0 0 13px var(--bg), 0 0 0 16px var(--sel); margin-block: 18px; }
 .rank.glitch-long { animation-duration: 0.62s; }
 .rank.rise { animation: r-rise 0.5s ease-out both; }
 .rank.slam { animation: r-slam 0.2s cubic-bezier(.55,0,.8,.2) both; }
@@ -358,7 +400,7 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
   <!-- HOME -->
   <section id="home" class="screen solid" aria-label="Home">
     <div class="home-top">
-      <div class="sys"><span>SYS.ARCHIVE</span><span>v0.3 // ONLINE</span></div>
+      <div class="sys"><span>SYS.ARCHIVE</span><span id="skinTag">v0.4 // ONLINE</span></div>
     </div>
     <div class="home-title">
       <h1>RHYTHM<br>ARCHIVE</h1>
@@ -445,6 +487,7 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
       <h2>ACHIEVEMENTS</h2>
       <span class="achv-count" id="achvCount">0 / 0</span>
     </div>
+    <div class="skin-row" id="skinRow" aria-label="Skins"></div>
     <div class="achv-list" id="achvList"></div>
   </section>
   <div id="toasts" aria-live="polite"></div>
@@ -549,12 +592,17 @@ const J_WEIGHT = [1, 0.75, 0.4, 0.1, 0];
 const breaksCombo = (j) => j === J.BAD || j === J.MISS;
 const css = getComputedStyle(document.documentElement);
 const C = (n) => css.getPropertyValue(n).trim();
-const COL = {
-  bg: C("--bg"), field: C("--field"), line: C("--line"), fg: C("--fg"), dim: C("--dim"), mute: C("--mute"),
-};
-// Monochrome: outer lanes white, inner lanes light grey, so chords still read at a glance.
-const LANE_COLORS = [COL.fg, "#b8b8b8", "#b8b8b8", COL.fg];
-const J_COLORS = [COL.fg, "#c8c8c8", "#9a9a9a", "#6e6e6e", "#4a4a4a"];
+const COL = { skin: "mono" };
+const LANE_COLORS = [], J_COLORS = [];
+// Pull colours from the active skin's CSS tokens (canvas can't read CSS variables directly).
+function loadSkinColors(skin) {
+  COL.skin = skin;
+  for (const k of ["bg", "field", "line", "fg", "dim", "mute", "accent", "accent2"]) COL[k] = C("--" + k);
+  // Monochrome: outer lanes white, inner lanes grey. Skins: outer accent, inner second accent.
+  LANE_COLORS.splice(0, 4, ...(skin === "mono" ? [COL.fg, "#b8b8b8", "#b8b8b8", COL.fg] : [COL.accent, COL.accent2, COL.accent2, COL.accent]));
+  J_COLORS.splice(0, 5, ...(skin === "mono" ? [COL.fg, "#c8c8c8", "#9a9a9a", "#6e6e6e", "#4a4a4a"] : [COL.fg, COL.accent, COL.accent2, COL.dim, COL.mute]));
+}
+loadSkinColors("mono");
 const START_LEAD_IN = 3.0;
 const RESUME_REWIND = 2.0;
 
@@ -2780,6 +2828,45 @@ function rr(x, y, w, h, r) {
   g.closePath();
 }
 // Diagonal hatch used for hold-note bodies (one cached pattern per color).
+// Boss-skin backdrop: a vignette that pulses on every beat, plus a rotating sigil (violet)
+// or scrolling hazard stripes (crimson).
+function skinBackdrop(t) {
+  if (COL.skin === "mono") return;
+  const { w, h } = view, bpm = game.song ? game.song.bpm : 120;
+  const beat = Math.max(0, t) * bpm / 60, pulse = Math.pow(1 - (beat - Math.floor(beat)), 3);
+  const vg = g.createRadialGradient(w / 2, h * 0.5, Math.min(w, h) * 0.22, w / 2, h * 0.5, Math.max(w, h) * 0.78);
+  vg.addColorStop(0, withAlpha(COL.accent, 0));
+  vg.addColorStop(1, withAlpha(COL.accent, 0.08 + 0.22 * pulse));
+  g.fillStyle = vg;
+  g.fillRect(0, 0, w, h);
+  const now = performance.now();
+  if (COL.skin === "violet") {
+    const R = Math.min(w, h) * 0.36;
+    g.save();
+    g.translate(w / 2, h * 0.42);
+    g.lineWidth = 1.5;
+    const poly = (r, n, rot) => { g.beginPath(); for (let k = 0; k <= n; k++) { const a = rot + (k / n) * Math.PI * 2; const px = Math.cos(a) * r, py = Math.sin(a) * r; k ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); };
+    g.strokeStyle = withAlpha(COL.accent, 0.14 + 0.16 * pulse);
+    g.beginPath(); g.arc(0, 0, R * 1.15, 0, Math.PI * 2); g.stroke();
+    poly(R, 6, now / 9000);
+    poly(R * 0.78, 3, -now / 7000);
+    poly(R * 0.78, 3, -now / 7000 + Math.PI);
+    g.strokeStyle = withAlpha(COL.accent2, 0.1 + 0.14 * pulse);
+    poly(R * 0.45, 6, now / 4000 + Math.PI / 6);
+    g.beginPath(); g.arc(0, 0, R * 0.2 * (1 + 0.15 * pulse), 0, Math.PI * 2); g.stroke();
+    g.restore();
+  } else {
+    const off = (now / 30) % 24;
+    g.fillStyle = withAlpha(COL.accent, 0.3 + 0.35 * pulse);
+    for (const y0 of [6, h - 16]) {
+      for (let x = -24 + off; x < w + 24; x += 24) {
+        g.beginPath(); g.moveTo(x, y0); g.lineTo(x + 12, y0); g.lineTo(x + 22, y0 + 10); g.lineTo(x + 10, y0 + 10); g.fill();
+      }
+    }
+    g.fillStyle = withAlpha(COL.accent, 0.05 * pulse);
+    g.fillRect(view.left, 0, view.laneW * LANES, h);
+  }
+}
 const hatchCache = new Map();
 function hatchPattern(color) {
   const key = color + "@" + view.dpr;
@@ -2941,6 +3028,8 @@ function draw() {
   g.fillStyle = COL.line;
   for (let i = 0; i <= LANES; i++) g.fillRect(view.left + i * lw - 0.5, 0, 1, h);
 
+  skinBackdrop(t);
+
   // beams
   for (let lane = 0; lane < LANES; lane++) {
     const held = laneHeld(lane);
@@ -2954,10 +3043,13 @@ function draw() {
   // judge line
   g.fillStyle = "rgba(255,255,255,0.05)";
   g.fillRect(view.left, jy - view.noteH * 0.75, fieldW, view.noteH * 1.5);
-  g.fillStyle = COL.fg;
+  const skinned = COL.skin !== "mono";
+  g.fillStyle = skinned ? COL.accent : COL.fg;
+  if (skinned) { g.shadowColor = COL.accent; g.shadowBlur = 16; }
   g.fillRect(view.left, jy - 1.5, fieldW, 3);
   // tick marks at lane edges on the judge line
   for (let i = 0; i <= LANES; i++) g.fillRect(view.left + i * lw - 1, jy - 8, 2, 16);
+  g.shadowBlur = 0;
 
   // notes
   const pps = pxPerSec();
@@ -3006,6 +3098,7 @@ function draw() {
         g.strokeRect(hx + 2, hy - nh / 2 + 2, hw - 4, nh - 4);
       }
     } else if (hy > -nh && hy < h + nh) {
+      if (COL.skin !== "mono") { g.fillStyle = withAlpha(color, 0.22); g.fillRect(x - lw * 0.5, hy - nh / 2 - 5, lw, nh + 10); }
       g.fillStyle = color;
       g.fillRect(x - lw * 0.47, hy - nh / 2, lw * 0.94, nh);
       g.fillStyle = COL.bg;
@@ -3034,7 +3127,7 @@ function drawHud(t) {
   // progress
   g.fillStyle = "rgba(255,255,255,0.08)";
   g.fillRect(0, 0, w, 4);
-  g.fillStyle = COL.fg;
+  g.fillStyle = COL.skin === "mono" ? COL.fg : COL.accent;
   g.fillRect(0, 0, w * Math.max(0, Math.min(1, t / game.endAt)), 4);
 
   const padL = Math.max(16, view.left > 70 ? 20 : 16);
@@ -3081,6 +3174,17 @@ function drawHud(t) {
     }
   }
 
+  if (t < -0.2 && game.state === "playing" && COL.skin !== "mono") {
+    // boss intro banner
+    const blink = Math.floor(performance.now() / 260) % 2 === 0;
+    g.textBaseline = "middle";
+    g.fillStyle = withAlpha(COL.accent, blink ? 1 : 0.35);
+    g.font = `900 ${Math.round(Math.min(44, w * 0.11))}px ${C("--font-display")}`;
+    g.fillText(COL.skin === "crimson" ? "WARNING" : "BREACH", w / 2, h * 0.27);
+    g.fillStyle = COL.dim;
+    g.font = `400 12px ${C("--font-mono")}`;
+    g.fillText(COL.skin === "crimson" ? "// ZERO PROTOCOL ENGAGED" : "// VOID PROTOCOL ONLINE", w / 2, h * 0.27 + 34);
+  }
   if (t < -0.2 && game.state === "playing") {
     g.textBaseline = "middle";
     g.fillStyle = COL.fg;
@@ -3360,7 +3464,15 @@ function showResult({ s, c, prev, newBest, rank, kind }) {
   };
   const unlocked = game.newAchievements || [];
   game.newAchievements = [];
-  const showToasts = () => { unlocked.splice(0).forEach((a, i) => setTimeout(() => toast(a.name), i * 700)); };
+  const showToasts = () => {
+    // Boss rewards first, then the rest; at most five banners, the remainder summarised.
+    const list = unlocked.splice(0).sort((x, y) => (y.reward ? 1 : 0) - (x.reward ? 1 : 0));
+    const queue = [];
+    list.forEach((a) => { queue.push([a.name]); if (a.reward) queue.push([achievements.skinName(a.reward), "// BOSS SKIN UNLOCKED · SELECT IN ACHIEVEMENTS"]); });
+    const shown = queue.length > 5 ? queue.slice(0, 4) : queue;
+    if (queue.length > 5) shown.push([`+${queue.length - 4} MORE`, "// SEE ACHIEVEMENTS"]);
+    shown.forEach((args, i) => setTimeout(() => toast(...args), i * 600));
+  };
   const onSkip = (e) => { if (!e.target.closest("button")) finish(); };
   screens.result.addEventListener("pointerdown", onSkip);
 
@@ -3425,10 +3537,10 @@ $("resMenu").addEventListener("click", quitToMenu);
 // ---------------------------------------------------------------- menu
 // ---------------------------------------------------------------- achievements
 const CLEAR_SCORE = 700000; // rank C or better counts as a clear
-function toast(name) {
+function toast(name, label = "// ACHIEVEMENT UNLOCKED") {
   const t = document.createElement("div");
   t.className = "toast";
-  const a = document.createElement("small"); a.textContent = "// ACHIEVEMENT UNLOCKED";
+  const a = document.createElement("small"); a.textContent = label;
   const b = document.createElement("b"); b.textContent = name;
   t.append(a, b);
   $("toasts").append(t);
@@ -3461,11 +3573,51 @@ const achievements = (() => {
     { id: "combo500", name: "CHAIN REACTION", desc: "Reach a 500 combo in one play.", event: (x) => x.score.maxCombo >= 500 },
     { id: "taps", name: "TEN THOUSAND TAPS", desc: "Hit 10,000 notes in total.", goal: 10000, value: (r) => r.hits },
     { id: "boss", name: "ZERO REACHED", desc: "Clear ZERO//ARCHIVE.", done: (r) => setOf(r.clears, BOSS).size >= 1 },
-    { id: "bossMaster", name: "ARCHIVE BREAKER", desc: "Clear ZERO//ARCHIVE on MASTER.", done: (r) => setOf(r.clears, BOSS).has(3) },
-    { id: "bossFc", name: "ZERO ERRORS", desc: "Full combo ZERO//ARCHIVE on MASTER.", done: (r) => setOf(r.fcs, BOSS).has(3) },
+    { id: "bossMaster", name: "ARCHIVE BREAKER", desc: "Clear ZERO//ARCHIVE on MASTER.", reward: "violet", done: (r) => setOf(r.clears, BOSS).has(3) },
+    { id: "bossFc", name: "ZERO ERRORS", desc: "Full combo ZERO//ARCHIVE on MASTER.", reward: "crimson", done: (r) => setOf(r.fcs, BOSS).has(3) },
     { id: "sync", name: "CALIBRATED", desc: "Apply an auto sync calibration.", manual: true },
   ];
   const unlockedMap = () => store.get("achievements", {});
+  // ---- skins (rewards)
+  const SKINS = [
+    { id: "mono", name: "MONOCHROME", note: "Default archive terminal.", sw: ["#000000", "#f2f2f2", "#8c8c8c"] },
+    { id: "violet", name: "VOID VIOLET", req: "bossMaster", sw: ["#07020f", "#b46bff", "#ff5fd8"] },
+    { id: "crimson", name: "CRIMSON ZERO", req: "bossFc", sw: ["#0b0203", "#ff2b3e", "#ff8a3d"] },
+  ];
+  const skinOpen = (sk) => !sk.req || !!unlockedMap()[sk.req];
+  function applySkin(id, save = true) {
+    const sk = SKINS.find((x) => x.id === id && skinOpen(x)) || SKINS[0];
+    if (sk.id === "mono") delete document.documentElement.dataset.skin;
+    else document.documentElement.dataset.skin = sk.id;
+    loadSkinColors(sk.id);
+    hatchCache.clear();
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = COL.bg;
+    $("skinTag").textContent = sk.id === "mono" ? "v0.4 // ONLINE" : `SKIN // ${sk.name}`;
+    if (save) store.set("skin", sk.id);
+  }
+  function renderSkins() {
+    const row = $("skinRow"), cur = store.get("skin", "mono"), got = unlockedMap();
+    row.replaceChildren();
+    for (const sk of SKINS) {
+      const open = skinOpen(sk);
+      const card = document.createElement("div"); card.className = open ? "skin" : "skin locked";
+      const sw = document.createElement("div"); sw.className = "sw";
+      sk.sw.forEach((c) => { const i = document.createElement("i"); i.style.background = c; sw.append(i); });
+      const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = sk.name;
+      const rq = document.createElement("span"); rq.className = "rq";
+      rq.textContent = sk.req ? (open ? "Boss reward unlocked." : `Unlock: ${LIST.find((a) => a.id === sk.req).name}`) : sk.note;
+      const btn = document.createElement("button"); btn.type = "button";
+      const inUse = cur === sk.id && open;
+      btn.textContent = !open ? "LOCKED" : inUse ? "IN USE" : "APPLY";
+      btn.disabled = !open;
+      btn.setAttribute("aria-pressed", String(inUse));
+      btn.addEventListener("click", () => { applySkin(sk.id); render(); });
+      card.append(sw, nm, rq, btn);
+      row.append(card);
+    }
+    void got;
+  }
   function unlock(id, silent = false) {
     const got = unlockedMap();
     if (got[id]) return null;
@@ -3499,6 +3651,7 @@ const achievements = (() => {
     return evaluate(r, { score, cleared });
   }
   function render() {
+    renderSkins();
     const r = rec(), got = unlockedMap(), list = $("achvList");
     list.replaceChildren();
     LIST.forEach((a, i) => {
@@ -3517,6 +3670,11 @@ const achievements = (() => {
         const fill = document.createElement("i"); fill.style.width = `${(100 * v) / goal}%`;
         bar.append(fill); card.append(bar);
       } else pg.textContent = "LOCKED";
+      if (a.reward) {
+        const rw = document.createElement("span"); rw.className = "rw";
+        rw.textContent = `REWARD // ${SKINS.find((x) => x.id === a.reward).name} SKIN`;
+        card.append(rw);
+      }
       list.append(card);
     });
     const n = Object.keys(got).filter((id) => LIST.some((a) => a.id === id)).length;
@@ -3525,7 +3683,8 @@ const achievements = (() => {
   }
   $("achvBtn").addEventListener("click", () => { render(); setScreen("achv"); screens.achv.scrollTop = 0; });
   $("achvBack").addEventListener("click", () => { setScreen("home"); render(); });
-  return { record, unlock, render };
+  const skinName = (id) => (SKINS.find((x) => x.id === id) || SKINS[0]).name;
+  return { record, unlock, render, applySkin, skinName };
 })();
 
 // ---------------------------------------------------------------- song preview (select screen)
@@ -3857,6 +4016,7 @@ const calib = (() => {
 })();
 
 setScreen("home");
+achievements.applySkin(store.get("skin", "mono"), false);
 achievements.render();
 
 // Test hook (read-only state for automated checks)
