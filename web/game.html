@@ -234,6 +234,30 @@ button:disabled { opacity: 0.3; cursor: default; }
   .detail-title .t { font-size: 22px; }
 }
 
+/* ---- achievements ---- */
+.achv-head { width: 100%; max-width: 980px; margin-inline: auto; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.achv-head h2 { margin: 0; text-align: center; font-family: var(--font-display); font-weight: 900; font-size: 16px; letter-spacing: 0.2em; }
+.achv-count { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.1em; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+.achv-list { width: 100%; max-width: 720px; margin: 14px auto 0; display: grid; gap: 8px; }
+.achv { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 12px; border: 1px solid var(--line); background: var(--panel); }
+.achv .ico { grid-row: span 2; width: 40px; height: 40px; border: 1px solid var(--line-strong); display: grid; place-items: center; font-family: var(--font-display); font-weight: 900; font-size: 13px; color: var(--mute); }
+.achv .nm { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
+.achv .ds { grid-column: 2 / 3; font-size: 12px; color: var(--dim); line-height: 1.4; }
+.achv .pg { grid-row: span 2; font-size: 11px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.achv .bar { grid-column: 2 / -1; height: 2px; background: var(--line); margin-top: 4px; }
+.achv .bar i { display: block; height: 100%; background: var(--dim); }
+.achv:not(.on) .nm { color: var(--dim); }
+.achv.on { border-color: var(--line-strong); }
+.achv.on .ico { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.achv.on .pg { color: var(--fg); }
+#toasts { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(calc(100% - 32px), 420px); display: flex; flex-direction: column; gap: 6px; z-index: 30; pointer-events: none; }
+.toast { background: var(--fg); color: var(--ink); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; animation: toast-in 0.3s ease-out both, toast-out 0.35s ease-in 2.6s forwards; }
+.toast small { font-size: 10px; letter-spacing: 0.24em; }
+.toast b { font-family: var(--font-display); font-weight: 900; font-size: 14px; letter-spacing: 0.1em; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(-8px); } }
+.finale.fail .finale-text { color: var(--dim); text-decoration: line-through; text-decoration-thickness: 3px; }
+
 /* ---- settings ---- */
 .setting {
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 12px;
@@ -268,7 +292,7 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
 }
 .finale.fc .finale-text, .finale.ap .finale-text { background: var(--fg); color: var(--ink); }
 .finale.ap .finale-text { animation: f-wipe 0.35s 0.3s cubic-bezier(.2,.8,.2,1) forwards, f-blink 0.16s 0.75s 5 steps(1); }
-.finale-sub { font-size: 12px; letter-spacing: 0.3em; color: var(--dim); opacity: 0; animation: f-fade 0.3s 0.65s forwards; }
+.finale-sub { font-size: 12px; letter-spacing: 0.3em; color: var(--dim); text-align: center; opacity: 0; animation: f-fade 0.3s 0.65s forwards; }
 @keyframes f-line { to { width: 100%; } }
 @keyframes f-wipe { to { clip-path: inset(0 0 0 0); } }
 @keyframes f-blink { 50% { background: var(--ink); color: var(--fg); outline: 2px solid var(--fg); } }
@@ -327,6 +351,7 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
     </div>
     <div class="home-actions">
       <button type="button" class="btn primary" id="homePlay">PLAY</button>
+      <button type="button" class="btn" id="achvBtn">Achievements</button>
       <button type="button" class="btn" id="settingsBtn">Settings</button>
       <p class="hint">No sound on iPhone? Check volume and silent switch.<br>Keyboard: D / F / J / K</p>
     </div>
@@ -396,6 +421,17 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
     </div>
   </section>
   <div id="flash"></div>
+
+  <!-- ACHIEVEMENTS -->
+  <section id="achv" class="screen solid" aria-label="Achievements" hidden>
+    <div class="achv-head">
+      <button type="button" class="head-btn" id="achvBack">&lt; HOME</button>
+      <h2>ACHIEVEMENTS</h2>
+      <span class="achv-count" id="achvCount">0 / 0</span>
+    </div>
+    <div class="achv-list" id="achvList"></div>
+  </section>
+  <div id="toasts" aria-live="polite"></div>
 
   <!-- SETTINGS -->
   <section id="settings" class="screen solid" aria-label="Settings" hidden>
@@ -675,7 +711,8 @@ class Synth {
     for (let i = 0; i < n; i++) {
       const tt = i / SR;
       let x = 0;
-      for (let v = 0; v < voices; v++) { ph[v] += inc[v]; if (ph[v] >= 1) ph[v] -= 1; x += 2 * ph[v] - 1; }
+      const bm = o.bend ? Math.pow(2, (o.bend * Math.max(0, 1 - tt / (o.bendTime || 0.12))) / 12) : 1;
+      for (let v = 0; v < voices; v++) { ph[v] += inc[v] * bm; if (ph[v] >= 1) ph[v] -= 1; x += 2 * ph[v] - 1; }
       x /= voices;
       const fc = o.cutEnv ? 2 * Math.sin(Math.PI * Math.min(7000, (o.cut ?? 3000) * (1 + o.cutEnv * Math.exp(-tt * (o.cutDecay ?? 8)))) / SR) : fixed;
       Synth.svf(st, x, fc, q);
@@ -800,7 +837,8 @@ class Synth {
     for (let i = 0; i < n; i++) {
       const tt = i / SR;
       const vib = Math.sin(2 * Math.PI * 5.5 * tt) * 0.12 * Math.min(1, tt / 0.25);
-      ph += 440 * Math.pow(2, (m + vib - 69) / 12) / SR; ph -= Math.floor(ph);
+      const bend = o.bend ? o.bend * Math.max(0, 1 - tt / (o.bendTime || 0.1)) : 0;
+      ph += 440 * Math.pow(2, (m + vib + bend - 69) / 12) / SR; ph -= Math.floor(ph);
       const x = 2 * ph - 1;
       Synth.svf(a, x, f1, 0.18); Synth.svf(b, x, f2, 0.22);
       let env = Math.min(1, tt / (o.att ?? 0.02));
@@ -909,6 +947,110 @@ class Synth {
       let x = lp * 0.25;
       if (this.noise() > 0.9993) x += this.noise() * 1.5;
       this.add(i, x * vol);
+    }
+  }
+
+  // ---- more voices (second archive set)
+  flute(t, len, m, vol) {
+    const s0 = Math.round(t * SR), rel = 0.12, n = Math.floor((len + rel) * SR);
+    const st = { low: 0, band: 0 }, fb = 2 * Math.sin(Math.PI * 2400 / SR);
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      const vib = Math.sin(2 * Math.PI * 5 * tt) * 0.15 * Math.min(1, Math.max(0, tt - 0.15) / 0.3);
+      ph += 440 * Math.pow(2, (m + vib - 69) / 12) / SR; ph -= Math.floor(ph);
+      Synth.svf(st, this.noise(), fb, 0.5);
+      const x = Math.sin(2 * Math.PI * ph) + 0.12 * Math.sin(4 * Math.PI * ph) + st.band * 0.25 * Math.exp(-tt * 6) + st.band * 0.05;
+      let env = Math.min(1, tt / 0.06);
+      if (tt > len) env *= Math.max(0, 1 - (tt - len) / rel);
+      this.add(s0 + i, x * env * vol);
+    }
+  }
+  // Clavinet-like: bright pulse with a fast closing filter.
+  clav(t, len, m, vol) {
+    const s0 = Math.round(t * SR), n = Math.floor((len + 0.02) * SR), f = Synth.freq(m);
+    const st = { low: 0, band: 0 };
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      ph += f / SR; ph -= Math.floor(ph);
+      const cut = 700 + 4500 * Math.exp(-tt * 30);
+      Synth.svf(st, ph < 0.3 ? 1 : -1, 2 * Math.sin(Math.PI * cut / SR), 0.3);
+      let env = Math.exp(-tt * 9);
+      if (tt > len) env *= Math.max(0, 1 - (tt - len) / 0.02);
+      this.add(s0 + i, st.low * env * vol);
+    }
+  }
+  brass(t, len, m, vol) {
+    this.supersaw(t, len, m, vol, { voices: 3, det: 0.006, cut: 700, cutEnv: 3, cutDecay: 4, att: 0.03, rel: 0.08, q: 0.9 });
+  }
+  // Reed / melodica / clarinet: saw through a soft low-pass with delayed vibrato.
+  reed(t, len, m, vol, o = {}) {
+    const s0 = Math.round(t * SR), rel = 0.06, n = Math.floor((len + rel) * SR);
+    const st = { low: 0, band: 0 }, fc = 2 * Math.sin(Math.PI * (o.cut || 1700) / SR);
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      const vib = Math.sin(2 * Math.PI * 5.5 * tt) * 0.18 * Math.min(1, Math.max(0, tt - 0.2) / 0.25);
+      ph += 440 * Math.pow(2, (m + vib - 69) / 12) / SR; ph -= Math.floor(ph);
+      Synth.svf(st, 2 * ph - 1 + 0.5 * (ph < 0.5 ? 1 : -1), fc, 0.7);
+      let env = Math.min(1, tt / 0.025);
+      if (tt > len) env *= Math.max(0, 1 - (tt - len) / rel);
+      this.add(s0 + i, st.low * env * vol);
+    }
+  }
+  // Dubstep wobble: saw + square through a low-pass swept by an LFO (`rate` sweeps per beat).
+  wobble(t, len, m, vol, rate, spb) {
+    const s0 = Math.round(t * SR), n = Math.floor((len + 0.02) * SR), f = Synth.freq(m);
+    const st = { low: 0, band: 0 }, lfoHz = rate / spb;
+    let p1 = 0, p2 = 0;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      p1 += f / SR; p1 -= Math.floor(p1);
+      p2 += f * 0.5 / SR; p2 -= Math.floor(p2);
+      const lfo = 0.5 - 0.5 * Math.cos(2 * Math.PI * lfoHz * tt);
+      const cut = 120 + 2600 * lfo * lfo;
+      Synth.svf(st, (2 * p1 - 1) + (p2 < 0.5 ? 0.8 : -0.8), 2 * Math.sin(Math.PI * cut / SR), 0.25);
+      let env = Math.min(1, tt / 0.004);
+      if (tt > len) env *= Math.max(0, 1 - (tt - len) / 0.02);
+      this.add(s0 + i, Math.tanh(st.low * 2.2) * env * vol);
+    }
+  }
+  slap(t, len, m, vol) {
+    this.ks(t, len, m, vol, { damp: 0.993, bright: 0.95 });
+    this.sub(t, Math.min(len, 0.25), m, vol * 0.7);
+  }
+  // Gamelan metallophone: two slightly detuned FM tones that beat against each other (ombak).
+  gamelan(t, len, m, vol) {
+    const rel = Math.min(0.6, len * 1.5 + 0.15);
+    this.fm(t, len, m, vol * 0.6, { ratio: 2.0, index: 1.3, idec: 3, dec: 1.0, rel });
+    const f = Synth.freq(m) + 5, s0 = Math.round(t * SR), n = Math.floor((len + rel) * SR), w = 2 * Math.PI * f / SR;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      this.add(s0 + i, Math.sin(w * i + 1.1 * Math.exp(-tt * 3) * Math.sin(2 * w * i)) * Math.exp(-tt * 1.0) * vol * 0.5);
+    }
+  }
+  gong(t, vol, m = 40) {
+    this.fm(t, 0.1, m, vol, { ratio: 1.41, index: 2.5, idec: 0.8, dec: 0.45, rel: 3.5 });
+    this.fm(t, 0.1, m + 0.3, vol * 0.6, { ratio: 2.0, index: 1, idec: 1, dec: 0.5, rel: 3.5 });
+  }
+  tom(t, vol, m = 50) {
+    const s0 = Math.round(t * SR), n = Math.floor(0.3 * SR);
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      ph += 2 * Math.PI * Synth.freq(m) * (1 + 0.6 * Math.exp(-tt * 25)) / SR;
+      this.add(s0 + i, Math.sin(ph) * Math.exp(-tt * 9) * vol);
+    }
+  }
+  // 80s gated snare: snare plus a noisy tail that is cut off abruptly.
+  gsnare(t, vol) {
+    this.snare(t, vol);
+    const s0 = Math.round(t * SR), n = Math.floor(0.22 * SR);
+    let lp = 0;
+    for (let i = 0; i < n; i++) {
+      lp += 0.35 * (this.noise() - lp);
+      this.add(s0 + i, lp * (i < n - 200 ? 0.6 : 0.6 * (n - i) / 200) * vol);
     }
   }
 
@@ -1584,7 +1726,7 @@ const PixelRain = composedSong({
     { tag: "bassJ", grid: [null, null, 2, 1], lanes: [0, 3], keep: (e) => true },
     { tag: "snare", grid: [null, null, null, 0], lanes: [1, 2] },
   ],
-  levels: [5, 8, 12, 15],
+  levels: [5, 8, 12, 16],
 });
 
 // ======================================================== 05  GLASS PROTOCOL — uplifting trance
@@ -1703,7 +1845,7 @@ const RustCathedral = composedSong({
     { tag: "kick", grid: [null, null, 0.5, 0], lanes: [3, 2] },
     { tag: "dbl", grid: [null, null, 0.5, 0.25], lanes: [3, 2] },
   ],
-  levels: [4, 6, 11, 14],
+  levels: [4, 6, 11, 15],
 });
 
 // ======================================================== 07  ACID LEDGER — acid techno
@@ -1867,11 +2009,538 @@ const ColdIndex = composedSong({
     { tag: "ride", grid: [null, null, null, 0.5], lanes: [3, 0] },
     { tag: "reese", grid: [null, 0.5, 0.5, 0.5], lanes: (e) => (e.midis[0] % 2 ? 0 : 3), hold: [null, 1.5, 1.5, 1.5] },
   ],
-  levels: [3, 8, 11, 14],
+  levels: [3, 8, 11, 15],
 });
 
+// ======================================================== HARBOR LIGHTS — reggae / dub, one-drop
+const HarborLights = composedSong({
+  id: "trk_harbor_lights", title: "Harbor Lights", genre: "REGGAE · DUB", bpm: 96,
+  swing: { unit: 0.5, amt: 0.08 }, echo: { beats: 0.75, fb: 0.5 },
+  compose(S) {
+    const CH = [["A4", "C5", "E5"], ["G4", "B4", "D5"], ["F4", "A4", "C5"], ["G4", "B4", "D5"]].map((c) => c.map(midiOf));
+    const BASS = ["A2:1 -:.5 A2:.5 C3:.5 E3:.5 -:1 |", "G2:1 -:.5 G2:.5 B2:.5 D3:.5 -:1 |",
+      "F2:1 -:.5 F2:.5 A2:.5 C3:.5 -:1 |", "G2:1 -:.5 D3:.5 B2:.5 G2:.5 -:1 |"];
+    const MEL = ["E5:1.5 D5:.5 C5:1 A4:1 |", "B4:1 D5:1 G5:1.5 F5:.5 |", "F5:1 E5:.5 D5:.5 C5:1 A4:1 |", "B4:2 -:1 D5:1 |",
+      "A5:1.5 G5:.5 E5:1 C5:1 |", "D5:.5 E5:.5 G5:1 B5:2 |", "A5:.5 G5:.5 F5:1 C5:1 A4:1 |", "G4:3 -:1 |"];
+    let b = 0;
+    const bar = (i, { skank = true, mel = false, dub = false } = {}) => {
+      const c = i % 4;
+      if (skank) [0.5, 1.5, 2.5, 3.5].forEach((o) => S.note(b + o, 0.18, CH[c], "skank", "skank"));
+      if (skank) for (let bt = 0; bt < 4; bt++) [0.25, 0.5].forEach((o, k) => S.note(b + bt + o, 0.12, CH[c][k + 1] - 12, "bubble", "bubble"));
+      S.line(b, BASS[c], "bass", "bass");
+      S.hit(b + 2, "kick", "drop"); S.hit(b + 2, "rim", null);
+      S.steps(b, "x.o.x.o.x.o.x.o.", "hat", "hat");
+      if (dub) { S.hit(b + 1, "snare", "dubsn"); S.hit(b + 3, "snare", "dubsn"); }
+      if (mel) S.line(b, MEL[i % 8], "melodica", "mel");
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) bar(i, {});
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { mel: true });
+    for (let i = 0; i < 4; i++) bar(i, { skank: i % 2 === 1, dub: true });
+    for (let i = 0; i < 8; i++) bar(i, { mel: true });
+    S.note(b, 4, CH[0], "skank", null); S.line(b, "A4:4 |", "melodica", "mel"); S.note(b, 2, midiOf("A2"), "bass", null);
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    skank: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.clav(t, d, m, 0.06)); },
+    bubble: (s, e, t, d) => s.to("main").organ(t, d, e.midis, 0.02),
+    bass: (s, e, t, d) => s.to("main").sub(t, d, e.midis[0], 0.42),
+    melodica: (s, e, t, d) => s.to("echo").reed(t, d, e.midis[0], 0.11, { cut: 1500 }),
+    kick: (s, e, t) => s.to("main").kick(t, 0.85),
+    rim: (s, e, t) => s.to("echo").rim(t, 0.12),
+    snare: (s, e, t) => s.to("echo").snare(t, 0.3),
+    hat: (s, e, t) => s.to("main").hat(t, 0.04 * e.vol, 80),
+  },
+  rules: [
+    { tag: "mel", grid: [1, 0.5, 0.5, 0.25], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "drop", grid: [0, 0, 0, 0], lanes: [1, 2] },
+    { tag: "skank", grid: [null, 0, 0, 0], lanes: [3, 2, 0, 1], keep: (e, D) => D >= 2 || Math.abs((e.beat % 2) - 1.5) < 1e-6, chord: [false, false, true, true] },
+    { tag: "bass", grid: [null, 1, 0.5, 0], lanes: "pitch", win: 4 },
+    { tag: "hat", grid: [null, null, 1, 0.5], lanes: [3, 0] },
+    { tag: "bubble", grid: [null, null, 0.5, 0], lanes: [1, 2] },
+    { tag: "dubsn", grid: [0, 0, 0, 0], lanes: [0, 3] },
+  ],
+  levels: [3, 6, 11, 14],
+});
+
+// ======================================================== VELVET SUNDIAL — bossa nova
+const VelvetSundial = composedSong({
+  id: "trk_velvet_sundial", title: "Velvet Sundial", genre: "BOSSA NOVA", bpm: 130,
+  echo: { beats: 1.5, fb: 0.2 }, lp: 7000,
+  compose(S) {
+    const CH = [["F3", "A3", "C4", "E4"], ["G3", "Bb3", "D4", "F4"], ["A3", "C4", "E4", "G4"], ["G3", "Bb3", "C4", "E4"]].map((c) => c.map(midiOf));
+    const ROOT = ["F2", "G2", "A2", "C3"].map(midiOf);
+    const FL = ["A5:1.5 G5:.5 F5:1 E5:1 |", "D5:1 F5:.5 A5:1 Bb5:1.5 |", "C6:2 A5:1 G5:1 |", "E5:3 -:1 |",
+      "C6:.5 Bb5:.5 A5:1 G5:.5 F5:.5 D5:1 |", "F5:1 G5:1 A5:.5 Bb5:.5 D6:1 |", "C6:1.5 A5:.5 E5:2 |", "F5:4 |"];
+    const HITS = [[0, 0.75, 1.5, 2.5, 3.25], [0.5, 1.5, 2.25, 3]];
+    let b = 0;
+    const bar = (i, { flute = null, perc = true } = {}) => {
+      const c = i % 4;
+      HITS[i % 2].forEach((o) => S.note(b + o, 0.3, CH[c], "gtr", "gtr"));
+      [[0, 1.5, 0], [1.5, 0.5, 7], [2, 1.5, 0], [3.5, 0.5, 7]].forEach(([o, d, iv]) => S.note(b + o, d, ROOT[c] + iv, "thumb", "thumb"));
+      if (perc) {
+        (i % 2 ? [1, 2] : [0, 1.5, 3]).forEach((o) => S.hit(b + o, "rim", "clave"));
+        S.steps(b, "xoooxoooxoooxooo", "shaker", null);
+        S.steps(b, "x.......x.......", "kick", null);
+      }
+      if (flute) S.line(b, flute, "flute", "mel");
+      b += 4;
+    };
+    for (let i = 0; i < 2; i++) bar(i, { perc: false });
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { flute: FL[i % 4] });
+    for (let i = 0; i < 8; i++) bar(i, { flute: FL[4 + (i % 4)] });
+    for (let i = 0; i < 8; i++) bar(i, { flute: FL[i] });
+    S.note(b, 4, CH[0], "gtr", "gtr"); S.note(b, 4, ROOT[0], "thumb", null); S.line(b, "F5:4 |", "flute", "mel");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    gtr: (s, e, t, d) => { s.to("main"); e.midis.forEach((m, k) => s.ks(t + k * 0.008, d, m, 0.09, { damp: 0.994, bright: 0.4 })); },
+    thumb: (s, e, t, d) => s.to("main").ks(t, d, e.midis[0], 0.22, { damp: 0.996, bright: 0.3 }),
+    flute: (s, e, t, d) => s.to("echo").flute(t, d, e.midis[0], 0.14),
+    rim: (s, e, t) => s.to("main").rim(t, 0.13),
+    shaker: (s, e, t) => s.to("main").hat(t, 0.02 * e.vol, 140),
+    kick: (s, e, t) => s.to("main").kick808(t, 0.4, 0.25, 60),
+  },
+  rules: [
+    { tag: "mel", grid: [1, 0.5, 0.5, 0.25], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "thumb", grid: [4, 2, 0.5, 0], lanes: "pitch", win: 4 },
+    { tag: "gtr", grid: [null, null, 0, 0], lanes: [2, 1, 3, 0], chord: [false, false, false, true] },
+    { tag: "clave", grid: [null, null, null, 0], lanes: [3, 0] },
+  ],
+  levels: [4, 6, 11, 15],
+});
+
+// ======================================================== CHROME HORIZON — synthwave
+const ChromeHorizon = composedSong({
+  id: "trk_chrome_horizon", title: "Chrome Horizon", genre: "SYNTHWAVE", bpm: 108,
+  echo: { beats: 0.75, fb: 0.35 },
+  compose(S) {
+    const PAD = [["A3", "C4", "E4"], ["A3", "C4", "F4"], ["G3", "C4", "E4"], ["G3", "B3", "D4"]].map((c) => c.map(midiOf));
+    const ROOT = ["A2", "F2", "C3", "G2"].map(midiOf);
+    const LEAD = ["E5:1 A5:1 B5:.5 C6:.5 B5:1 |", "A5:1 F5:1 C5:1 A5:1 |", "G5:1.5 E5:.5 C6:1 B5:1 |", "D6:2 B5:1 G5:1 |",
+      "A5:.5 B5:.5 C6:1 E6:1 D6:1 |", "C6:1 A5:1 F5:1 A5:1 |", "G5:1 C6:1 E6:1 G6:1 |", "D6:2 B5:2 |"];
+    let b = 0;
+    const bar = (i, { drums = true, lead = null, soft = false, fill = false } = {}) => {
+      const c = i % 4;
+      S.note(b, 4, PAD[c], "pad", null);
+      for (let k = 0; k < 16; k++) S.note(b + k / 4, 0.22, ROOT[c] + [0, 12, 7, 12][k % 4], "arp", "arp");
+      if (drums) {
+        S.steps(b, "x.......x.x.....", "kick", "kick");
+        S.steps(b, "....x.......x...", "gsnare", "snare");
+        S.steps(b, "x.x.x.x.x.x.x.x.", "hat", null);
+      }
+      if (fill) for (let k = 8; k < 16; k++) S.hit(b + k / 4, "tom", "tom", { m: 57 - (k - 8) * 2 });
+      if (lead) S.line(b, lead, soft ? "leadSoft" : "lead", "lead");
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) bar(i, { drums: i >= 2 });
+    for (let i = 0; i < 8; i++) bar(i, { lead: LEAD[i % 4], soft: true });
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { lead: LEAD[4 + (i % 4)] });
+    for (let i = 0; i < 4; i++) bar(i, { drums: false, fill: i === 3 });
+    for (let i = 0; i < 8; i++) bar(i, { lead: LEAD[i] });
+    S.note(b, 4, PAD[0], "pad", null); S.line(b, "A5:4 |", "lead", "lead"); S.hit(b, "kick", "kick"); S.hit(b, "gsnare", null);
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    pad: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.supersaw(t, d, m, 0.022, { voices: 5, cut: 1400, att: 0.4, rel: 0.6 })); },
+    arp: (s, e, t, d) => s.to("main").bass(t, d, e.midis[0], 0.2),
+    lead: (s, e, t, d) => s.to("echo").brass(t, d, e.midis[0], 0.09),
+    leadSoft: (s, e, t, d) => s.to("echo").reed(t, d, e.midis[0], 0.07, { cut: 1400 }),
+    kick: (s, e, t) => s.to("main").kick(t, 0.95),
+    gsnare: (s, e, t) => s.to("main").gsnare(t, 0.5),
+    hat: (s, e, t) => s.to("main").hat(t, 0.05, 70),
+    tom: (s, e, t) => s.to("main").tom(t, 0.5, e.m),
+  },
+  rules: [
+    { tag: "lead", grid: [1, 0.5, 0.5, 0.5], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "snare", grid: [null, 0, 0, 0], lanes: [1, 2] },
+    { tag: "arp", grid: [null, null, 0.5, 0.25], lanes: (e) => [0, 2, 1, 3][Math.round(e.beat * 4) % 4] },
+    { tag: "tom", grid: [null, 0.5, 0.25, 0.25], lanes: [3, 2, 1, 0] },
+    { tag: "kick", grid: [2, null, null, null], lanes: [1, 2], keep: (e) => e.beat < 16 },
+  ],
+  levels: [3, 6, 10, 18],
+});
+
+// ======================================================== BRASS TACKS — funk
+const BrassTacks = composedSong({
+  id: "trk_brass_tacks", title: "Brass Tacks", genre: "FUNK", bpm: 104,
+  compose(S) {
+    const BASS = {
+      E: "E2:.25 -:.25 E3:.25 E2:.25 -:.5 G2:.25 A2:.25 B2:.5 E2:.25 D3:.25 -:.5 E3:.25 D3:.25 |",
+      A: "A2:.25 -:.25 A3:.25 A2:.25 -:.5 C3:.25 D3:.25 E3:.5 A2:.25 G3:.25 -:.5 A3:.25 G3:.25 |",
+    };
+    const CLAV = { E: ["G#3", "D4", "F#4", "B4"].map(midiOf), A: ["C#4", "G4", "B4", "E5"].map(midiOf) };
+    const STAB = "B4+E5:.5 -:.25 B4+E5:.25 -:.5 D5+G5:.5 -:1 E5+A5:.25 D5+G5:.25 B4+E5:.5 |";
+    const HORN = ["E5:.5 G5:.5 A5:.25 B5:.75 -:.5 D6:.5 B5:.5 A5:.5 |", "G5:.75 E5:.25 -:.5 D5:.5 E5:2 |",
+      "A5:.5 B5:.5 D6:.25 E6:.75 -:.5 D6:.5 B5:.5 A5:.5 |", "B5:.75 A5:.25 -:.5 G5:.5 E5:2 |"];
+    let b = 0;
+    const bar = (i, { bass = true, clav = true, drums = true, stab = false, horn = null } = {}) => {
+      const k = i % 4 === 2 ? "A" : "E";
+      if (bass) S.line(b, BASS[k], "slap", "slap");
+      if (clav) [..."x.xx.x.xx.x.xx.x"].forEach((ch, st) => { if (ch === "x") S.note(b + st / 4, 0.15, CLAV[k], "clav", "clav"); });
+      if (drums) {
+        S.steps(b, "x..x..x...x.x...", "kick", "kick");
+        [..."....x..o.o..x..o"].forEach((ch, st) => { if (ch !== ".") S.hit(b + st / 4, "snare", ch === "x" ? "snare" : "ghost", { vol: ch === "x" ? 1 : 0.3 }); });
+        S.steps(b, "xoxoxoxoxoxoxoxo", "hat", null);
+      }
+      if (stab) S.line(b, STAB, "horn", "stab");
+      if (horn) S.line(b, horn, "horn", "hmel");
+      b += 4;
+    };
+    for (let i = 0; i < 2; i++) bar(i, { bass: false, clav: false });
+    for (let i = 0; i < 6; i++) bar(i, {});
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { stab: true });
+    for (let i = 0; i < 8; i++) bar(i, { clav: i % 2 === 0, horn: HORN[i % 4] });
+    for (let i = 0; i < 2; i++) bar(i, { clav: false, drums: false });
+    for (let i = 0; i < 8; i++) bar(i, { stab: i % 2 === 0, horn: i % 2 ? HORN[i % 4] : null });
+    S.note(b, 2, ["E4", "G#4", "D5", "G5"].map(midiOf), "horn", "stab"); S.note(b, 2, midiOf("E2"), "slap", "slap"); S.hit(b, "kick", "kick");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    slap: (s, e, t, d) => s.to("main").slap(t, d, e.midis[0], 0.3),
+    clav: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.clav(t, d, m, 0.035)); },
+    horn: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.brass(t, d, m, 0.07)); },
+    kick: (s, e, t) => s.to("main").kick(t, 0.9),
+    snare: (s, e, t) => s.to("main").snare(t, 0.45 * e.vol),
+    hat: (s, e, t) => s.to("main").hat(t, 0.035 * e.vol, 90),
+  },
+  rules: [
+    { tag: "slap", grid: [1, 0.5, 0, 0], lanes: "pitch", win: 4 },
+    { tag: "snare", grid: [0, 0, 0, 0], lanes: [1, 2], keep: (e, D) => D > 0 || e.beat < 8 || e.beat >= 64 },
+    { tag: "stab", grid: [null, 0.5, 0, 0], lanes: [3, 0], chord: [false, false, true, true] },
+    { tag: "hmel", grid: [1, 0.5, 0.25, 0.25], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "ghost", grid: [null, null, null, 0], lanes: [2, 1] },
+    { tag: "clav", grid: [null, null, null, 0.5], lanes: [3, 2] },
+  ],
+  levels: [4, 10, 14, 19],
+});
+
+// ======================================================== CLOCKWORK WALTZ — music-box waltz in 3/4
+const ClockworkWaltz = composedSong({
+  id: "trk_clockwork_waltz", title: "Clockwork Waltz", genre: "WALTZ · 3/4", bpm: 172, barLen: 3,
+  echo: { beats: 1.5, fb: 0.3 },
+  compose(S) {
+    const ROOT = ["D3", "A2", "D3", "G2", "C3", "F2", "Bb2", "A2"].map(midiOf);
+    const CH = [["D4", "F4", "A4"], ["C#4", "E4", "G4"], ["D4", "F4", "A4"], ["D4", "G4", "Bb4"],
+      ["C4", "E4", "G4"], ["C4", "F4", "A4"], ["D4", "F4", "Bb4"], ["C#4", "E4", "G4"]].map((c) => c.map(midiOf));
+    const W = ["A5:1 D6:1 F6:1 |", "E6:2 C#6:1 |", "D6:1 F6:.5 E6:.5 D6:1 |", "Bb5:2 G5:1 |",
+      "C6:1 E6:1 G6:1 |", "F6:1.5 E6:.5 C6:1 |", "D6:1 Bb5:1 F5:1 |", "A5:3 |"];
+    const V = ["A5:.5 D6:.5 F6:.5 A6:.5 F6:.5 D6:.5 |", "E6:.5 G6:.5 A6:.5 G6:.5 E6:.5 C#6:.5 |",
+      "D6:.5 F6:.5 E6:.5 D6:.5 C#6:.5 D6:.5 |", "Bb5:.5 D6:.5 G6:.5 D6:.5 Bb5:.5 G5:.5 |",
+      "C6:.5 E6:.5 G6:.5 C7:.5 G6:.5 E6:.5 |", "F6:.5 A6:.5 C7:.5 A6:.5 F6:.5 C6:.5 |",
+      "D6:.5 F6:.5 Bb6:.5 F6:.5 D6:.5 Bb5:.5 |", "A5:.5 C#6:.5 E6:.5 G6:.5 E6:.5 C#6:.5 |"];
+    let b = 0;
+    const bar = (i, { mel, band = true, chime = false } = {}) => {
+      const c = i % 8;
+      if (band) { S.note(b, 1, ROOT[c], "pizz", "oom"); S.note(b + 1, 0.5, CH[c], "pizz", "pah"); S.note(b + 2, 0.5, CH[c], "pizz", "pah"); }
+      S.hit(b, "tick", "tick", { m: 96 }); S.hit(b + 1, "tick", "tick", { m: 91 }); S.hit(b + 2, "tick", "tick", { m: 91 });
+      if (chime) S.note(b, 2, CH[c][0] + 24, "chime", null);
+      S.line(b, mel[c], "box", "mel");
+      b += 3;
+    };
+    for (let i = 0; i < 4; i++) bar(i, { mel: W, band: false });
+    for (let i = 0; i < 8; i++) bar(i, { mel: W });
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { mel: V });
+    for (let i = 0; i < 8; i++) bar(i, { mel: W, chime: i % 2 === 0 });
+    for (let i = 0; i < 16; i++) bar(i, { mel: V, chime: i >= 8 });
+    S.note(b, 3, ROOT[0], "pizz", "oom"); S.note(b, 3, CH[0], "chime", null); S.line(b, "D6:3 |", "box", "mel");
+    return { beat: pv, beats: 24 };
+  },
+  voices: {
+    box: (s, e, t, d) => s.to("echo").fm(t, d, e.midis[0], 0.11, { ratio: 4, index: 1.1, idec: 9, dec: 2.6, rel: 0.3 }),
+    pizz: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.ks(t, d * 0.5, m, e.midis.length > 1 ? 0.07 : 0.24, { damp: 0.99, bright: 0.5 })); },
+    chime: (s, e, t, d) => { s.to("echo"); e.midis.forEach((m) => s.fm(t, d, m, 0.05, { ratio: 3.5, index: 2.5, idec: 2, dec: 0.9, rel: 0.8 })); },
+    tick: (s, e, t) => s.to("main").rim(t, e.m > 93 ? 0.09 : 0.05),
+  },
+  rules: [
+    // EASY follows beats 1 and 3 of each bar; MASTER adds the "pah-pah" chords
+    { tag: "mel", grid: [0, 1, 0.5, 0.5], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5], keep: (e, D) => D > 0 || [0, 2].some((o) => Math.abs((((e.beat % 3) + 3) % 3) - o) < 1e-6) },
+    { tag: "oom", grid: [null, 3, 3, 3], lanes: [0, 3] },
+    { tag: "pah", grid: [null, null, null, 1], lanes: [1, 2], chord: [false, false, false, true] },
+    { tag: "tick", grid: [null, null, 3, 1], lanes: [0, 3] },
+  ],
+  levels: [4, 8, 11, 14],
+});
+
+// ======================================================== GOLD LATTICE — gamelan-style interlocking
+const GoldLattice = composedSong({
+  id: "trk_gold_lattice", title: "Gold Lattice", genre: "GAMELAN", bpm: 120,
+  echo: { beats: 1, fb: 0.25 },
+  compose(S) {
+    const LAD = ["E5", "F5", "G5", "B5", "C6", "E6", "F6", "G6"].map(midiOf); // pelog-like ladder
+    const BAL = [[0, 1, 2, 1], [3, 4, 3, 2], [2, 3, 4, 5], [4, 3, 1, 0]];
+    let b = 0;
+    const bar = (i, { slow = false, polos = false, sangsih = false, kendang = false } = {}) => {
+      const core = BAL[i % 4];
+      if (slow) { S.note(b, 2, LAD[core[0]] - 12, "bal", "bal"); S.note(b + 2, 2, LAD[core[2]] - 12, "bal", "bal"); }
+      else core.forEach((k, q) => S.note(b + q, 1, LAD[k] - 12, "bal", "bal"));
+      core.forEach((k, q) => {
+        const line = [k, k + 1, k + 2, k + 1].map((x) => LAD[Math.min(7, x)]);
+        if (polos) { S.note(b + q, 0.25, line[0], "metal", "polos"); S.note(b + q + 0.5, 0.25, line[2], "metal", "polos"); }
+        if (sangsih) { S.note(b + q + 0.25, 0.25, line[1], "metal", "sangsih"); S.note(b + q + 0.75, 0.25, line[3], "metal", "sangsih"); }
+      });
+      if (i % 2 === 0) S.hit(b, "gong", "gong", { m: 40 }); else S.hit(b, "gong", null, { m: 47 });
+      if (kendang) [..."x..x.x..x..x.x."].forEach((ch, st) => { if (ch === "x") S.hit(b + st / 4, "tom", null, { m: st % 3 ? 55 : 50 }); });
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) bar(i, { slow: true });
+    for (let i = 0; i < 8; i++) bar(i, { polos: true });
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { polos: true, sangsih: true });
+    for (let i = 0; i < 4; i++) bar(i, { slow: true });
+    for (let i = 0; i < 8; i++) bar(i, { polos: true, sangsih: true, kendang: true });
+    S.hit(b, "gong", "gong", { m: 40 }); S.note(b, 4, LAD[0] - 12, "bal", "bal");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    bal: (s, e, t, d) => s.to("main").gamelan(t, d, e.midis[0], 0.16),
+    metal: (s, e, t, d) => s.to("echo").gamelan(t, d, e.midis[0], 0.09),
+    gong: (s, e, t) => s.to("main").gong(t, 0.28, e.m),
+    tom: (s, e, t) => s.to("main").tom(t, 0.3, e.m),
+  },
+  rules: [
+    { tag: "bal", grid: [2, 1, 1, 1], lanes: "pitch", hold: [2, 2, 2, 2] },
+    { tag: "gong", grid: [0, 0, 0, 0], lanes: [1, 2] },
+    { tag: "polos", grid: [null, 1, 0.5, 0.5], lanes: (e) => (e.midis[0] % 2 ? 0 : 1) },
+    { tag: "sangsih", grid: [null, null, null, 0], lanes: (e) => (e.midis[0] % 2 ? 3 : 2) },
+  ],
+  levels: [3, 7, 10, 14],
+});
+
+// ======================================================== WOBBLE SHRINE — dubstep, half-time
+const WobbleShrine = composedSong({
+  id: "trk_wobble_shrine", title: "Wobble Shrine", genre: "DUBSTEP", bpm: 140,
+  duck: { depth: 0.4, rel: 0.12 }, echo: { beats: 0.75, fb: 0.4 },
+  compose(S) {
+    const PAD = ["F3", "Ab3", "C4", "Eb4"].map(midiOf);
+    const CHOPS = ["C5:1 Ab4:1 F4:2 |", "Eb5:1.5 C5:.5 Ab4:2 |", "F5:1 Eb5:1 C5:1 Bb4:1 |", "C5:4 |"];
+    const W = [
+      [[0, 1.5, "F2", 2], [1.5, 0.5, "F2", 4], [2, 1, "Ab2", 3], [3, 1, "Eb2", 4]],
+      [[0, 1, "F2", 4], [1, 1, "F2", 3], [2, 1, "Db2", 2], [3, 0.5, "C2", 4], [3.5, 0.5, "C3", 4]],
+      [[0, 0.5, "F2", 4], [0.5, 0.5, "F3", 4], [1, 1, "Ab2", 3], [2, 1.5, "Bb2", 2], [3.5, 0.5, "C3", 4]],
+    ];
+    const BASE = { 36: 0, 37: 0, 39: 1, 41: 1, 44: 2, 46: 2, 48: 3, 53: 3 };
+    let b = 0;
+    const drumsHalf = (rolls) => {
+      S.steps(b, "x.........x.....", "kick", "kick");
+      S.hit(b + 2, "snare", "snare");
+      S.steps(b, rolls ? "x.x.x.x.x.x.xxxx" : "x.x.x.x.x.x.x.x.", "hat", "hat");
+    };
+    const drop = (i, rolls) => {
+      for (const [o, d, n, rate] of W[i % 3]) {
+        const m = midiOf(n);
+        S.note(b + o, d, m, "wob", null, { rate });
+        const pulses = Math.max(1, Math.round(d * rate));
+        for (let p = 0; p < pulses; p++) S.note(b + o + p / rate, 0, m, "none", "wob", { base: BASE[m] ?? 1, alt: p % 2 === 1, first: p === 0, rate });
+      }
+      drumsHalf(rolls);
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) { S.note(b, 4, PAD, "pad", null); S.line(b, CHOPS[i], "chop", "chop"); b += 4; }
+    for (let i = 0; i < 4; i++) {
+      S.note(b, 4, PAD, "pad", null);
+      const n = [4, 8, 16, 16][i];
+      for (let k = 0; k < n; k++) S.hit(b + (k * 4) / n, "snare", "roll", { vol: 0.4 + 0.6 * k / n });
+      if (i === 3) S.hit(b, "riser", null);
+      b += 4;
+    }
+    const pv = b;
+    for (let i = 0; i < 8; i++) drop(i, i % 4 === 3);
+    for (let i = 0; i < 4; i++) { S.note(b, 4, PAD, "pad", null); S.line(b, CHOPS[i], "chop", "chop"); if (i >= 2) S.hit(b + 2, "snare", "snare"); b += 4; }
+    for (let i = 0; i < 8; i++) drop(i + 1, i % 2 === 1);
+    S.note(b, 2, midiOf("F2"), "wob", null, { rate: 1 }); S.hit(b, "kick", "kick"); S.hit(b, "snare", "snare");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    wob: (s, e, t, d, spb) => { s.to("duck"); s.wobble(t, d, e.midis[0], 0.17, e.rate, spb); s.sub(t, d, e.midis[0] - 12, 0.25); },
+    none: () => {},
+    pad: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.supersaw(t, d, m, 0.02, { voices: 5, cut: 1200, att: 0.5, rel: 0.5 })); },
+    chop: (s, e, t, d) => s.to("echo").vox(t, d, e.midis[0], 0.11, { vowel: "o", att: 0.05, rel: 0.2 }),
+    kick: (s, e, t) => s.to("main").kick(t, 1),
+    snare: (s, e, t) => { s.to("main").snare(t, 0.55 * (e.vol || 1)); s.clap(t, 0.2 * (e.vol || 1)); },
+    hat: (s, e, t) => s.to("main").hat(t, 0.04, 90),
+    riser: (s, e, t, d, spb) => s.to("main").riser(t, 4 * spb, 0.3),
+  },
+  rules: [
+    { tag: "wob", grid: [2, 0.5, 0, 0], lanes: (e) => (e.alt ? opposite(e.base) : e.base), keep: (e, D) => D !== 2 || e.first || e.rate <= 3 },
+    { tag: "snare", grid: [0, 0, 0, 0], lanes: [1, 2] },
+    { tag: "chop", grid: [1, 0.5, 0.5, 0.5], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "roll", grid: [1, 1, 0.5, 0.25], lanes: [0, 2, 1, 3] },
+    { tag: "kick", grid: [null, 0, 0, 0], lanes: [0, 3] },
+    { tag: "hat", grid: [null, null, null, 0.5], lanes: [3, 0] },
+  ],
+  levels: [4, 9, 10, 18],
+});
+
+// ======================================================== SUGAR STATIC — future bass
+const SugarStatic = composedSong({
+  id: "trk_sugar_static", title: "Sugar Static", genre: "FUTURE BASS", bpm: 150,
+  duck: { depth: 0.7, rel: 0.25 }, echo: { beats: 0.75, fb: 0.3 },
+  compose(S) {
+    const CH = [["F3", "A3", "C4", "E4", "G4"], ["G3", "B3", "D4", "E4"], ["E3", "G3", "B3", "D4"], ["A3", "C4", "E4", "G4"]].map((c) => c.map(midiOf));
+    const ROOT = ["F2", "G2", "E2", "A2"].map(midiOf);
+    const VOC = ["C6:.5 A5:.25 G5:.25 E5:.5 G5:.5 A5:.75 C6:.25 -:1 |", "D6:.5 C6:.5 A5:.5 G5:.5 E5:1 D5:1 |",
+      "E5:.25 G5:.25 A5:.5 C6:.5 E6:.5 D6:.5 C6:.5 A5:1 |", "G5:2 E5:1 -:1 |"];
+    const STUT = [[0, 0.5, 0], [0.75, 0.25, 0], [1.5, 0.5, 0], [2.25, 0.75, -3], [3, 0.25, 0], [3.5, 0.5, 0]];
+    let b = 0;
+    const hats = () => { S.steps(b, "x.x.x.x.x.x.x.x.", "hat", null); for (let k = 0; k < 4; k++) S.hit(b + 3.5 + k * 0.125, "hat", null); };
+    const bar = (i, { mode, voc = false } = {}) => {
+      const c = i % 4;
+      if (mode === "soft") S.note(b, 4, CH[c], "chord", "chordSoft", { soft: true });
+      if (mode === "drop") {
+        STUT.forEach(([o, d, bend]) => S.note(b + o, d, CH[c], "chord", "chord", { bend }));
+        S.steps(b, "x.....x...x.....", "kick", "kick");
+        S.hit(b + 2, "snare", "snare");
+        S.note(b, 1.5, ROOT[c], "b808", "b808"); S.note(b + 2.5, 1, ROOT[c] + 12, "b808", "b808");
+        hats();
+      }
+      if (mode === "verse") { hats(); S.hit(b + 2, "snare", "snare"); }
+      if (voc) S.line(b, VOC[c], "vchop", "vchop");
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) bar(i, { mode: "soft" });
+    for (let i = 0; i < 8; i++) { bar(i, { mode: "verse", voc: true }); S.note(b - 4, 4, CH[i % 4], "chord", null, { soft: true }); }
+    for (let i = 0; i < 4; i++) {
+      S.note(b, 4, CH[i], "chord", null, { soft: true });
+      const n = [4, 8, 16, 16][i];
+      for (let k = 0; k < n; k++) S.hit(b + (k * 4) / n, "snare", "roll", { vol: 0.4 + 0.6 * k / n });
+      b += 4;
+    }
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { mode: "drop", voc: true });
+    for (let i = 0; i < 2; i++) bar(i, { mode: "soft", voc: true });
+    for (let i = 0; i < 8; i++) bar(i, { mode: "drop", voc: i % 2 === 0 });
+    S.note(b, 4, CH[0], "chord", "chordSoft", { soft: true }); S.line(b, "C6:4 |", "vchop", "vchop");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    chord: (s, e, t, d) => { s.to("duck"); e.midis.forEach((m) => s.supersaw(t, d, m + (e.soft ? 0 : 12), e.soft ? 0.03 : 0.034, { voices: 5, det: 0.016, cut: e.soft ? 1600 : 5200, att: e.soft ? 0.3 : 0.005, rel: e.soft ? 0.5 : 0.04, bend: e.bend })); },
+    vchop: (s, e, t, d) => s.to("echo").vox(t, d, e.midis[0], 0.11, { vowel: "i", bend: -2, bendTime: 0.06 }),
+    b808: (s, e, t, d) => s.to("main").sub(t, d, e.midis[0], 0.4),
+    kick: (s, e, t) => s.to("main").kick808(t, 0.8, 0.3, 55),
+    snare: (s, e, t) => { s.to("main").clap(t, 0.35 * (e.vol || 1)); s.snare(t, 0.3 * (e.vol || 1)); },
+    hat: (s, e, t) => s.to("main").hat(t, 0.035, 110),
+  },
+  rules: [
+    { tag: "chordSoft", grid: [4, 4, 4, 4], lanes: [1, 2], hold: [2, 2, 2, 2] },
+    { tag: "chord", grid: [4, 0.5, 0, 0], lanes: [2, 1, 3, 0, 2, 1], chord: [false, false, false, true] },
+    { tag: "vchop", grid: [2, 0.5, 0.25, 0.25], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "snare", grid: [0, 0, 0, 0], lanes: [0, 3] },
+    { tag: "roll", grid: [1, 1, 0.5, 0.25], lanes: [0, 2, 1, 3] },
+    { tag: "b808", grid: [null, null, null, 0], lanes: [0, 3] },
+  ],
+  levels: [5, 9, 11, 16],
+});
+
+// ======================================================== FOOTNOTE — footwork / juke
+const Footnote = composedSong({
+  id: "trk_footnote", title: "Footnote", genre: "FOOTWORK", bpm: 160,
+  echo: { beats: 0.5, fb: 0.25 },
+  compose(S) {
+    const K = ["x..x..x.x..x..x.", "x..x..x..x..x.x."];
+    const STUT = "x.xx..x.x.xx..x.";
+    const NOTES = ["C5", "Eb5", "F5", "G5", "Bb5"].map(midiOf);
+    const ROOT = ["F2", "Db2", "Eb2", "C2"].map(midiOf);
+    const PAD = [["F3", "Ab3", "C4"], ["Db3", "F3", "Ab3"], ["Eb3", "G3", "Bb3"], ["C3", "E3", "G3"]].map((c) => c.map(midiOf));
+    let b = 0;
+    const bar = (i, { kick = null, stut = false, bass = false, clap = true, dbl = false } = {}) => {
+      const c = i % 4;
+      S.note(b, 4, PAD[c], "pad", null);
+      if (kick !== null) S.steps(b, K[kick], "kick", "kick");
+      if (clap) S.steps(b, dbl ? "....x...x.x.x..." : "....x.......x...", "clap", "clap");
+      if (kick !== null) S.steps(b, "xxxxxxxxxxxxxxxx", "hat", null);
+      if (stut) { let k = 0; [...STUT].forEach((ch, st) => { if (ch === "x") S.note(b + st / 4, 0.2, NOTES[(k++ + i) % 5], "stut", "stut"); }); }
+      if (bass) S.note(b, 1.5, ROOT[c], "b808", "b808");
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) bar(i, { stut: true, clap: false });
+    for (let i = 0; i < 8; i++) bar(i, { kick: 0 });
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { kick: 1, stut: true, bass: true });
+    for (let i = 0; i < 2; i++) bar(i, { stut: true, clap: false });
+    for (let i = 0; i < 12; i++) bar(i, { kick: i % 2, stut: true, bass: true, dbl: i >= 8 });
+    S.note(b, 2, ROOT[0], "b808", null); S.hit(b, "kick", "kick"); S.note(b, 1, NOTES[0], "stut", "stut");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    stut: (s, e, t, d) => s.to("echo").vox(t, d, e.midis[0], 0.1, { vowel: "a", att: 0.004, rel: 0.03 }),
+    pad: (s, e, t, d) => s.to("main").pad(t, d, e.midis, 0.03),
+    b808: (s, e, t, d) => s.to("main").sub(t, d, e.midis[0], 0.42),
+    kick: (s, e, t) => s.to("main").kick808(t, 0.85, 0.3, 50),
+    clap: (s, e, t) => s.to("main").clap(t, 0.32),
+    hat: (s, e, t) => s.to("main").hat(t, 0.025, 120),
+  },
+  rules: [
+    { tag: "kick", grid: [2, 1, 0, 0], lanes: [0, 1] },
+    { tag: "stut", grid: [2, 1, 0.5, 0], lanes: "pitch", win: 4 },
+    { tag: "clap", grid: [null, 2, 0, 0], lanes: [2, 3] },
+    { tag: "b808", grid: [null, null, null, 0], lanes: [3, 0] },
+  ],
+  levels: [5, 6, 15, 19],
+});
+
+// ======================================================== SWING ENGINE — electro swing
+const SwingEngine = composedSong({
+  id: "trk_swing_engine", title: "Swing Engine", genre: "ELECTRO SWING", bpm: 168,
+  swing: { unit: 0.5, amt: 0.16 }, duck: { depth: 0.35, rel: 0.12 },
+  compose(S) {
+    const WALK = ["G2:1 A2:1 Bb2:1 B2:1 |", "C3:1 D3:1 Eb3:1 E3:1 |", "D3:1 C3:1 A2:1 F#2:1 |", "G2:1 Bb2:1 D3:1 F#2:1 |"];
+    const CH = [["G3", "Bb3", "D4"], ["G3", "C4", "Eb4"], ["F#3", "A3", "C4", "D4"], ["G3", "Bb3", "D4"]].map((c) => c.map(midiOf));
+    const SM = ["D5:.5 G5:.5 Bb5:.5 A5:.5 G5:1 D5:1 |", "Eb5:.5 G5:.5 C6:.5 Bb5:.5 G5:.5 Eb5:.5 C5:1 |",
+      "F#5:.5 A5:.5 C6:.5 Eb6:.5 D6:1 A5:1 |", "G5:3 -:1 |"];
+    const RUN = ["G5:.25 A5:.25 Bb5:.25 C6:.25 D6:.5 Bb5:.5 G5:.5 D5:.5 G5:1 |",
+      "C6:.25 D6:.25 Eb6:.25 D6:.25 C6:.5 G5:.5 Eb5:.5 C5:.5 Eb5:1 |",
+      "D6:.25 C6:.25 A5:.25 F#5:.25 D5:.5 F#5:.5 A5:.5 C6:.5 D6:1 |", "Bb5:.5 A5:.5 G5:.5 F#5:.5 G5:2 |"];
+    let b = 0;
+    const bar = (i, { mel = null, drums = true, brass = false } = {}) => {
+      const c = i % 4;
+      S.line(b, WALK[c], "upright", "walk");
+      [[0, 0.5], [1.5, 0.5]].forEach(([o, d]) => S.note(b + o, d, CH[c], "piano", null));
+      if (drums) {
+        S.steps(b, "x...x...x...x...", "kick", "kick");
+        S.steps(b, "....x.......x...", "snare", "snare");
+        S.steps(b, "x.x.x.x.x.x.x.x.", "hat", null);
+      }
+      if (brass) [0.5, 2.5].forEach((o) => S.note(b + o, 0.4, CH[c].map((m) => m + 12), "brass", "brass"));
+      if (mel) S.line(b, mel, "clarinet", "mel");
+      b += 4;
+    };
+    for (let i = 0; i < 4; i++) bar(i, { drums: i >= 2 });
+    for (let i = 0; i < 8; i++) bar(i, { mel: SM[i % 4] });
+    const pv = b;
+    for (let i = 0; i < 8; i++) bar(i, { mel: RUN[i % 4] });
+    for (let i = 0; i < 4; i++) bar(i, { drums: false, mel: SM[i], brass: true });
+    for (let i = 0; i < 8; i++) bar(i, { mel: RUN[i % 4], brass: true });
+    S.line(b, "G2:2 |".replace("|", "-:2 |"), "upright", null); S.note(b, 2, CH[0].map((m) => m + 12), "brass", "brass"); S.line(b, "G5:4 |", "clarinet", "mel"); S.hit(b, "kick", "kick");
+    return { beat: pv, beats: 32 };
+  },
+  voices: {
+    upright: (s, e, t, d) => s.to("duck").ks(t, d * 0.9, e.midis[0], 0.3, { damp: 0.995, bright: 0.3 }),
+    piano: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.fm(t, d, m, 0.05, { ratio: 1, index: 2, idec: 6, dec: 3, rel: 0.1 })); },
+    brass: (s, e, t, d) => { s.to("main"); e.midis.forEach((m) => s.brass(t, d, m, 0.05)); },
+    clarinet: (s, e, t, d) => s.to("main").reed(t, d, e.midis[0], 0.12, { cut: 2600 }),
+    kick: (s, e, t) => s.to("main").kick(t, 0.85),
+    snare: (s, e, t) => { s.to("main").snare(t, 0.4); s.clap(t, 0.15); },
+    hat: (s, e, t) => s.to("main").hat(t, 0.04, 70),
+  },
+  rules: [
+    { tag: "mel", grid: [1, 0.5, 0.25, 0.25], lanes: "pitch", hold: [1.5, 1.5, 1.5, 1.5] },
+    { tag: "walk", grid: [null, 2, 1, 1], lanes: "pitch", win: 4 },
+    { tag: "brass", grid: [null, null, 0, 0], lanes: [3, 0], chord: [false, false, false, true] },
+    { tag: "snare", grid: [null, null, null, 0], lanes: [1, 2] },
+  ],
+  levels: [5, 10, 15, 17],
+});
+
+const ARCHIVE_TRACKS_2 = [HarborLights, VelvetSundial, ChromeHorizon, BrassTacks, ClockworkWaltz, GoldLattice, WobbleShrine, SugarStatic, Footnote, SwingEngine];
+
 // Listed from easiest to hardest (measured note density), between Neon Pulse and the boss.
-const ARCHIVE_TRACKS = [RustCathedral, ColdIndex, PixelRain, PaperSatellites, HexGarden, StaticBloom, GlassProtocol, AcidLedger];
+const ARCHIVE_TRACKS = [HarborLights, GoldLattice, ClockworkWaltz, VelvetSundial, RustCathedral, ColdIndex, PixelRain, SugarStatic, PaperSatellites, HexGarden, StaticBloom, SwingEngine, ChromeHorizon, WobbleShrine, GlassProtocol, AcidLedger, BrassTacks, Footnote];
 
 
 function clickTrack(bpm, beats) {
@@ -2450,7 +3119,7 @@ const KEYS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
 window.addEventListener("keydown", (e) => {
   if (e.code === "Escape") {
     if (game.state === "settings") { prefs.back(); return; }
-    if (game.state === "menu") { setScreen("home"); return; }
+    if (game.state === "menu" || game.state === "achv") { setScreen("home"); return; }
     if (game.state === "playing") pauseGame();
     else if (game.state === "paused") resumeGame();
     return;
@@ -2480,11 +3149,12 @@ async function requestWakeLock() {
 
 // ============================================================ screens
 const $ = (id) => document.getElementById(id);
-const screens = { home: $("home"), menu: $("menu"), pause: $("pause"), result: $("result"), calib: $("calib"), settings: $("settings") };
+const screens = { achv: $("achv"), home: $("home"), menu: $("menu"), pause: $("pause"), result: $("result"), calib: $("calib"), settings: $("settings") };
 function setScreen(s) {
   game.state = s;
   if (s !== "menu") preview.stop();
   screens.home.hidden = s !== "home";
+  screens.achv.hidden = s !== "achv";
   screens.menu.hidden = s !== "menu";
   screens.pause.hidden = s !== "paused";
   screens.result.hidden = s !== "result";
@@ -2541,6 +3211,10 @@ const SFX = {
     s.lead(0.16, 0.6, 84, 0.2); s.kick(0.16, 0.95); s.pad(0.16, 0.6, [60, 67, 72], 0.06);
   },
   // S, SS, SSS: "bee-ba-ba-bam"
+  fail: (s) => {
+    [72, 69, 65, 60].forEach((m, i) => s.lead(i * 0.14, 0.12, m, 0.14));
+    s.lead(0.56, 0.9, 53, 0.12, true); s.kick(0.56, 0.6);
+  },
   rankS: (s) => {
     s.lead(0, 0.09, 96, 0.13); s.click(0, 0.4, 2637);
     s.lead(0.2, 0.06, 84, 0.2); s.lead(0.3, 0.06, 84, 0.2);
@@ -2606,18 +3280,21 @@ function finishSong() {
   const prev = store.get(key, 0);
   const newBest = s.score > prev;
   if (newBest) store.set(key, s.score);
-  const result = { s, c, prev, newBest, rank: rankOf(s.score), kind: s.allPerfect ? "ap" : s.fullCombo ? "fc" : "clear" };
+  const cleared = s.score >= CLEAR_SCORE;
+  const kind = !cleared ? "fail" : s.allPerfect ? "ap" : s.fullCombo ? "fc" : "clear";
+  const result = { s, c, prev, newBest, rank: rankOf(s.score), kind };
+  game.newAchievements = achievements.record({ song: game.song, D: DIFFS.indexOf(c.difficulty), score: s, cleared });
 
-  // Finale: CLEAR / FULL COMBO / ALL PERFECT over the frozen playfield.
+  // Finale: CLEAR / FULL COMBO / ALL PERFECT (or FAILED) over the frozen playfield.
   const fin = $("finale");
   fin.className = "finale " + result.kind;
-  $("finaleText").textContent = { clear: "CLEAR", fc: "FULL COMBO", ap: "ALL PERFECT" }[result.kind];
-  $("finaleSub").textContent = { clear: "// TRACK COMPLETE", fc: "// NO BREAK DETECTED", ap: "// FLAWLESS RECORD" }[result.kind];
+  $("finaleText").textContent = { fail: "FAILED", clear: "CLEAR", fc: "FULL COMBO", ap: "ALL PERFECT" }[result.kind];
+  $("finaleSub").textContent = { fail: "// RECORD INCOMPLETE · 700,000 TO CLEAR", clear: "// TRACK COMPLETE", fc: "// NO BREAK DETECTED", ap: "// FLAWLESS RECORD" }[result.kind];
   // restart CSS animations
   fin.querySelectorAll("*").forEach((el) => { el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; });
   clearReveal();
   setScreen("finale");
-  playSfx({ clear: "clear", fc: "fullcombo", ap: "allperfect" }[result.kind]);
+  playSfx({ fail: "fail", clear: "clear", fc: "fullcombo", ap: "allperfect" }[result.kind]);
   if (result.kind === "ap") later(330, flash);
   game.pendingResult = result;
   later(result.kind === "ap" ? 2600 : 2200, () => showResult(result));
@@ -2630,7 +3307,7 @@ function showResult({ s, c, prev, newBest, rank, kind }) {
   const rankEl = $("resRank");
   rankEl.textContent = rank;
   rankEl.className = "rank pending";
-  $("resClear").textContent = kind === "ap" ? "[ ALL PERFECT ]" : kind === "fc" ? "[ FULL COMBO ]" : "[ CLEAR ]";
+  $("resClear").textContent = kind === "fail" ? "[ FAILED ]" : kind === "ap" ? "[ ALL PERFECT ]" : kind === "fc" ? "[ FULL COMBO ]" : "[ CLEAR ]";
   $("resScore").textContent = "0";
   $("resBest").textContent = newBest ? "// NEW RECORD ARCHIVED" : `// BEST ${prev.toLocaleString("en-US")}`;
   const rows = [
@@ -2663,7 +3340,11 @@ function showResult({ s, c, prev, newBest, rank, kind }) {
     const sFrame = rank === "SSS" ? " tier-sss" : rank === "SS" ? " tier-ss" : "";
     rankEl.className = "rank" + (tier === "s" ? " tier-s" + sFrame : tier === "a" ? " tier-a" : "");
     screens.result.removeEventListener("pointerdown", onSkip);
+    showToasts();
   };
+  const unlocked = game.newAchievements || [];
+  game.newAchievements = [];
+  const showToasts = () => { unlocked.splice(0).forEach((a, i) => setTimeout(() => toast(a.name), i * 700)); };
   const onSkip = (e) => { if (!e.target.closest("button")) finish(); };
   screens.result.addEventListener("pointerdown", onSkip);
 
@@ -2713,6 +3394,7 @@ function showResult({ s, c, prev, newBest, rank, kind }) {
     later(R + hitAt + (lv === 3 ? 900 : 530), () => { $("resClear").classList.add("in"); $("resBest").classList.add("in"); });
   }
   later(R + (tier === "s" ? 2200 : 1300), () => { if (!skipped) finish(); });
+  later(R + (tier === "s" ? 1300 : 800), showToasts);
 }
 
 $("finale").addEventListener("pointerdown", () => { if (game.pendingResult) showResult(game.pendingResult); });
@@ -2725,6 +3407,111 @@ $("resRetry").addEventListener("click", retry);
 $("resMenu").addEventListener("click", quitToMenu);
 
 // ---------------------------------------------------------------- menu
+// ---------------------------------------------------------------- achievements
+const CLEAR_SCORE = 700000; // rank C or better counts as a clear
+function toast(name) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  const a = document.createElement("small"); a.textContent = "// ACHIEVEMENT UNLOCKED";
+  const b = document.createElement("b"); b.textContent = name;
+  t.append(a, b);
+  $("toasts").append(t);
+  playSfx("rankLow");
+  setTimeout(() => t.remove(), 3100);
+}
+const achievements = (() => {
+  const BOSS = "boss_zero_archive";
+  const ODD = ["trk_hex_garden", "trk_clockwork_waltz"];
+  const rec = () => store.get("records", { plays: 0, hits: 0, clears: {}, fcs: {}, aps: {} });
+  const setOf = (map, id) => new Set(map[id] || []);
+  const countTracks = (map, pred = () => true) => Object.entries(map).filter(([, ds]) => ds.some(pred)).length;
+  const genresCleared = (r) => new Set(SONGS.filter((s) => (r.clears[s.id] || []).length).map((s) => s.genre)).size;
+  const total = () => SONGS.length;
+  const LIST = [
+    { id: "boot", name: "BOOT SEQUENCE", desc: "Clear any track (700,000 or more).", done: (r) => countTracks(r.clears) >= 1 },
+    { id: "regular", name: "REGULAR", desc: "Finish 30 plays.", goal: 30, value: (r) => r.plays },
+    { id: "archivist", name: "ARCHIVIST", desc: "Clear 10 different tracks.", goal: 10, value: (r) => countTracks(r.clears) },
+    { id: "complete", name: "COMPLETE ARCHIVE", desc: "Clear every track in the archive.", goal: () => total(), value: (r) => countTracks(r.clears) },
+    { id: "genre", name: "GENRE HOPPER", desc: "Clear tracks from 10 different genres.", goal: 10, value: (r) => genresCleared(r) },
+    { id: "hard", name: "HARD WIRED", desc: "Clear any track on HARD.", done: (r) => countTracks(r.clears, (d) => d === 2) >= 1 },
+    { id: "master", name: "MASTER KEY", desc: "Clear any track on MASTER.", done: (r) => countTracks(r.clears, (d) => d === 3) >= 1 },
+    { id: "master10", name: "MASTER COLLECTION", desc: "Clear 10 different tracks on MASTER.", goal: 10, value: (r) => countTracks(r.clears, (d) => d === 3) },
+    { id: "odd", name: "ODD ONE IN", desc: "Clear both odd-meter tracks (7/8 and 3/4) on HARD or above.", goal: 2, value: (r) => ODD.filter((id) => (r.clears[id] || []).some((d) => d >= 2)).length },
+    { id: "fc", name: "NO BREAK", desc: "Get a full combo.", done: (r) => countTracks(r.fcs) >= 1 },
+    { id: "fcMaster", name: "UNBROKEN MASTER", desc: "Full combo a track on MASTER.", done: (r) => countTracks(r.fcs, (d) => d === 3) >= 1 },
+    { id: "ap", name: "FLAWLESS", desc: "All perfect on any track.", done: (r) => countTracks(r.aps) >= 1 },
+    { id: "srank", name: "S-CLASS", desc: "Score 950,000 or more.", event: (x) => x.score.score >= 950000 },
+    { id: "sss", name: "TRIPLE S", desc: "Score 990,000 or more.", event: (x) => x.score.score >= 990000 },
+    { id: "combo500", name: "CHAIN REACTION", desc: "Reach a 500 combo in one play.", event: (x) => x.score.maxCombo >= 500 },
+    { id: "taps", name: "TEN THOUSAND TAPS", desc: "Hit 10,000 notes in total.", goal: 10000, value: (r) => r.hits },
+    { id: "boss", name: "ZERO REACHED", desc: "Clear ZERO//ARCHIVE.", done: (r) => setOf(r.clears, BOSS).size >= 1 },
+    { id: "bossMaster", name: "ARCHIVE BREAKER", desc: "Clear ZERO//ARCHIVE on MASTER.", done: (r) => setOf(r.clears, BOSS).has(3) },
+    { id: "bossFc", name: "ZERO ERRORS", desc: "Full combo ZERO//ARCHIVE on MASTER.", done: (r) => setOf(r.fcs, BOSS).has(3) },
+    { id: "sync", name: "CALIBRATED", desc: "Apply an auto sync calibration.", manual: true },
+  ];
+  const unlockedMap = () => store.get("achievements", {});
+  function unlock(id, silent = false) {
+    const got = unlockedMap();
+    if (got[id]) return null;
+    got[id] = Date.now();
+    store.set("achievements", got);
+    const a = LIST.find((x) => x.id === id);
+    if (!silent && a) toast(a.name);
+    return a;
+  }
+  const goalOf = (a) => (typeof a.goal === "function" ? a.goal() : a.goal);
+  function evaluate(r, last) {
+    const got = unlockedMap(), fresh = [];
+    for (const a of LIST) {
+      if (got[a.id] || a.manual) continue;
+      const ok = a.event ? last && last.cleared && a.event(last) : a.done ? a.done(r) : a.value(r) >= goalOf(a);
+      if (ok) { got[a.id] = Date.now(); fresh.push(a); }
+    }
+    store.set("achievements", got);
+    return fresh;
+  }
+  // Called once per finished play; returns achievements unlocked by it.
+  function record({ song, D, score, cleared }) {
+    const r = rec();
+    r.plays += 1;
+    r.hits += score.counts.slice(0, 4).reduce((a, b) => a + b, 0);
+    const add = (map) => { const set = setOf(map, song.id); set.add(D); map[song.id] = [...set]; };
+    if (cleared) add(r.clears);
+    if (cleared && score.fullCombo) add(r.fcs);
+    if (score.allPerfect) add(r.aps);
+    store.set("records", r);
+    return evaluate(r, { score, cleared });
+  }
+  function render() {
+    const r = rec(), got = unlockedMap(), list = $("achvList");
+    list.replaceChildren();
+    LIST.forEach((a, i) => {
+      const on = !!got[a.id];
+      const card = document.createElement("div"); card.className = on ? "achv on" : "achv";
+      const ico = document.createElement("span"); ico.className = "ico"; ico.textContent = on ? "■" : String(i + 1).padStart(2, "0");
+      const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = a.name;
+      const pg = document.createElement("span"); pg.className = "pg";
+      const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = a.desc;
+      card.append(ico, nm, pg, ds);
+      if (on) pg.textContent = new Date(got[a.id]).toLocaleDateString();
+      else if (a.value) {
+        const goal = goalOf(a), v = Math.min(goal, a.value(r));
+        pg.textContent = `${v.toLocaleString("en-US")} / ${goal.toLocaleString("en-US")}`;
+        const bar = document.createElement("div"); bar.className = "bar";
+        const fill = document.createElement("i"); fill.style.width = `${(100 * v) / goal}%`;
+        bar.append(fill); card.append(bar);
+      } else pg.textContent = "LOCKED";
+      list.append(card);
+    });
+    const n = Object.keys(got).filter((id) => LIST.some((a) => a.id === id)).length;
+    $("achvCount").textContent = `${n} / ${LIST.length}`;
+    $("achvBtn").textContent = `Achievements  ${n} / ${LIST.length}`;
+  }
+  $("achvBtn").addEventListener("click", () => { render(); setScreen("achv"); screens.achv.scrollTop = 0; });
+  $("achvBack").addEventListener("click", () => { setScreen("home"); render(); });
+  return { record, unlock, render };
+})();
+
 // ---------------------------------------------------------------- song preview (select screen)
 const preview = (() => {
   const cv = $("previewCanvas"), pg = cv.getContext("2d");
@@ -3045,6 +3832,7 @@ const calib = (() => {
   $("calApply").addEventListener("click", () => {
     if (!has) return;
     settings.offsetMs = measured;
+    achievements.unlock("sync");
     result.textContent = `Applied. Offset is now ${fmt(settings.offsetMs)}.`;
     $("calApply").disabled = true;
   });
@@ -3053,8 +3841,9 @@ const calib = (() => {
 })();
 
 setScreen("home");
+achievements.render();
 
 // Test hook (read-only state for automated checks)
-window.__rhythm = { game, conductor, settings, press, songTimeNow, SONGS, finishSong };
+window.__rhythm = { game, conductor, settings, press, songTimeNow, SONGS, finishSong, achievements };
 })();
 </script>
