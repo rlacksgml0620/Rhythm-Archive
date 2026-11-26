@@ -197,6 +197,29 @@ button:disabled { opacity: 0.3; cursor: default; }
 .slot .v { font-size: 12px; color: var(--fg); }
 .slot.now { border-color: var(--fg); }
 .slot.off .v { color: var(--mute); text-decoration: line-through; }
+/* ---- settings ---- */
+.setting {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 12px;
+  padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
+}
+.setting .name { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+.setting .name small { display: block; color: var(--dim); font-size: 11px; letter-spacing: 0.06em; margin-top: 2px; text-transform: none; }
+.setting output { font-family: var(--font-display); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+.setting input[type="range"] { grid-column: 1 / -1; }
+.setting.off { opacity: 0.4; }
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; margin: 0; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--line-strong); }
+input[type="range"]::-moz-range-track { height: 2px; background: var(--line-strong); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -9px; background: var(--fg); border: 0; border-radius: 0; }
+input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: var(--fg); border: 0; border-radius: 0; }
+input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; }
+.toggle { display: flex; gap: 6px; }
+.toggle button { height: 40px; min-width: 56px; padding: 0 10px; border: 1px solid var(--line-strong); font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: 0.12em; }
+.toggle button[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.toggle button.test { min-width: 0; color: var(--dim); }
+
 /* ---- finale (after the last note) ---- */
 .finale { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.62);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -277,21 +300,7 @@ button:disabled { opacity: 0.3; cursor: default; }
         <div class="best" id="bestLine"></div>
       </div>
 
-      <div class="settings">
-        <div class="stepper">
-          <span class="name">Speed<small>Note fall rate</small></span>
-          <button type="button" id="speedDown" aria-label="Slower">−</button>
-          <output id="speedVal">5.0</output>
-          <button type="button" id="speedUp" aria-label="Faster">+</button>
-        </div>
-        <div class="stepper">
-          <span class="name">Offset<small>+ if notes feel early</small></span>
-          <button type="button" id="offDown" aria-label="Decrease offset">−</button>
-          <output id="offVal">0 ms</output>
-          <button type="button" id="offUp" aria-label="Increase offset">+</button>
-        </div>
-        <button type="button" class="btn" id="calibBtn">Auto sync calibration</button>
-      </div>
+      <button type="button" class="btn" id="settingsBtn">Settings</button>
 
       <button type="button" class="btn primary" id="playBtn">PLAY</button>
       <p class="hint">No sound on iPhone? Check volume and silent switch.<br>Keyboard: D / F / J / K</p>
@@ -304,6 +313,7 @@ button:disabled { opacity: 0.3; cursor: default; }
       <h2 class="big-title">PAUSED</h2>
       <button type="button" class="btn primary" id="resumeBtn">RESUME</button>
       <button type="button" class="btn" id="retryBtn">RETRY</button>
+      <button type="button" class="btn" id="pauseSettingsBtn">SETTINGS</button>
       <button type="button" class="btn" id="quitBtn">QUIT</button>
     </div>
   </section>
@@ -336,6 +346,69 @@ button:disabled { opacity: 0.3; cursor: default; }
     </div>
   </section>
   <div id="flash"></div>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="screen solid" aria-label="Settings" hidden>
+    <div class="col">
+      <div class="brand">
+        <div class="sys"><span>SYS.CONFIG</span><span>SAVED ON THIS DEVICE</span></div>
+        <h1 style="font-size:30px">SETTINGS</h1>
+      </div>
+
+      <div class="group">
+        <span class="label">Audio</span>
+        <div class="setting">
+          <label class="name" for="musicVol">Music volume</label>
+          <output id="musicVolVal">90</output>
+          <input type="range" id="musicVol" min="0" max="100" step="5">
+        </div>
+        <div class="setting">
+          <span class="name">Hit sound<small>Click when you tap a lane</small></span>
+          <div class="toggle">
+            <button type="button" class="test" id="hitTest">TEST</button>
+            <button type="button" id="hitOn" aria-pressed="true">ON</button>
+          </div>
+        </div>
+        <div class="setting" id="hitVolRow">
+          <label class="name" for="hitVol">Hit sound volume</label>
+          <output id="hitVolVal">60</output>
+          <input type="range" id="hitVol" min="0" max="100" step="5">
+        </div>
+        <div class="setting">
+          <label class="name" for="sfxVol">Effects volume<small>Clear and rank sounds</small></label>
+          <output id="sfxVolVal">80</output>
+          <input type="range" id="sfxVol" min="0" max="100" step="5">
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="label">Display</span>
+        <div class="setting">
+          <span class="name">FAST / SLOW<small>Show early or late under the judgement</small></span>
+          <div class="toggle"><button type="button" id="fastSlowOn" aria-pressed="true">ON</button></div>
+        </div>
+        <div class="stepper">
+          <span class="name">Note speed<small>How fast notes fall</small></span>
+          <button type="button" id="speedDown" aria-label="Slower">−</button>
+          <output id="speedVal">5.0</output>
+          <button type="button" id="speedUp" aria-label="Faster">+</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="label">Timing</span>
+        <div class="stepper">
+          <span class="name">Offset<small>+ if notes feel early</small></span>
+          <button type="button" id="offDown" aria-label="Decrease offset">−</button>
+          <output id="offVal">0 ms</output>
+          <button type="button" id="offUp" aria-label="Increase offset">+</button>
+        </div>
+        <button type="button" class="btn" id="calibBtn">Auto sync calibration</button>
+      </div>
+
+      <button type="button" class="btn primary" id="settingsBack" style="height:56px;font-size:16px;letter-spacing:0.24em">BACK</button>
+    </div>
+  </section>
 
   <!-- CALIBRATION -->
   <section id="calib" class="screen solid" aria-label="Sync calibration" hidden>
@@ -393,6 +466,16 @@ const settings = {
   set speed(v) { store.set("speed", Math.round(Math.min(10, Math.max(1, v)) * 2) / 2); },
   get offsetMs() { return store.get("offsetMs", 0); },
   set offsetMs(v) { store.set("offsetMs", Math.round(Math.min(300, Math.max(-300, v)))); },
+  get musicVol() { return store.get("musicVol", 90); },
+  set musicVol(v) { store.set("musicVol", v); audio.applyVolumes(); },
+  get hitOn() { return store.get("hitOn", true); },
+  set hitOn(v) { store.set("hitOn", !!v); },
+  get hitVol() { return store.get("hitVol", 60); },
+  set hitVol(v) { store.set("hitVol", v); audio.applyVolumes(); },
+  get sfxVol() { return store.get("sfxVol", 80); },
+  set sfxVol(v) { store.set("sfxVol", v); audio.applyVolumes(); },
+  get fastSlow() { return store.get("fastSlow", true); },
+  set fastSlow(v) { store.set("fastSlow", !!v); },
 };
 const bestKey = (song, diff) => `best.${song}.${diff}`;
 
@@ -875,13 +958,24 @@ const audio = {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AC({ latencyHint: "interactive" });
+      // music, hit sounds and effects each get their own volume
       this.out = this.ctx.createGain();
-      this.out.connect(this.ctx.destination);
+      this.hit = this.ctx.createGain();
+      this.sfx = this.ctx.createGain();
+      for (const n of [this.out, this.hit, this.sfx]) n.connect(this.ctx.destination);
+      this.applyVolumes();
     }
     // iOS 17+: play even when the ringer switch is on silent
     try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) { /* unsupported */ }
     if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
     return this.ctx;
+  },
+  applyVolumes() {
+    if (!this.ctx) return;
+    const v = (x) => Math.pow(x / 100, 1.6); // perceptual curve
+    this.out.gain.value = v(settings.musicVol);
+    this.hit.gain.value = v(settings.hitVol);
+    this.sfx.gain.value = v(settings.sfxVol);
   },
   buffer(key, makeSamples) {
     if (this.buffers.has(key)) return this.buffers.get(key);
@@ -1146,6 +1240,7 @@ function press(lane, t, alt = -1) {
   if (other && (!pick || Math.abs(other.d) + 0.03 < Math.abs(pick.d))) { pick = other; useLane = alt; }
   game.beams[useLane] = 0.6;
   game.lastHeld[useLane] = t;
+  playHit();
   if (!pick) return;
   game.qi[useLane]++;
   const j = evaluate(pick.d);
@@ -1330,7 +1425,7 @@ function drawHud(t) {
       g.fillStyle = J_COLORS[jd.j];
       g.font = `900 ${Math.round(Math.min(48, view.laneW * 0.38))}px ${C("--font-display")}`;
       g.fillText(J_NAMES[jd.j], 0, 0);
-      if (jd.j !== J.PERFECT && jd.j !== J.MISS && Number.isFinite(jd.delta)) {
+      if (settings.fastSlow && jd.j !== J.PERFECT && jd.j !== J.MISS && Number.isFinite(jd.delta)) {
         g.fillStyle = COL.dim;
         g.font = `400 13px ${C("--font-mono")}`;
         g.fillText(jd.delta < 0 ? "<< FAST" : "SLOW >>", 0, 30);
@@ -1391,6 +1486,7 @@ document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: fals
 const KEYS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
 window.addEventListener("keydown", (e) => {
   if (e.code === "Escape") {
+    if (game.state === "settings") { prefs.back(); return; }
     if (game.state === "playing") pauseGame();
     else if (game.state === "paused") resumeGame();
     return;
@@ -1420,13 +1516,14 @@ async function requestWakeLock() {
 
 // ============================================================ screens
 const $ = (id) => document.getElementById(id);
-const screens = { menu: $("menu"), pause: $("pause"), result: $("result"), calib: $("calib") };
+const screens = { menu: $("menu"), pause: $("pause"), result: $("result"), calib: $("calib"), settings: $("settings") };
 function setScreen(s) {
   game.state = s;
   screens.menu.hidden = s !== "menu";
   screens.pause.hidden = s !== "paused";
   screens.result.hidden = s !== "result";
   screens.calib.hidden = s !== "calib";
+  screens.settings.hidden = s !== "settings";
   $("finale").hidden = s !== "finale";
   $("pauseBtn").hidden = s !== "playing";
 }
@@ -1511,7 +1608,21 @@ function playSfx(name) {
   const buf = audio.buffer("sfx-" + name, () => { const s = new Synth(name === "tick" ? 0.1 : 3); SFX[name](s); return s.finish(); });
   const src = audio.ctx.createBufferSource();
   src.buffer = buf;
-  src.connect(audio.out);
+  src.connect(audio.sfx);
+  src.start();
+}
+// Short dry click for taps.
+function playHit() {
+  if (!audio.ctx || !settings.hitOn) return;
+  const buf = audio.buffer("sfx-hit", () => {
+    const s = new Synth(0.08);
+    s.click(0, 0.9, 1900);
+    s.hat(0, 0.35, 140);
+    return s.finish();
+  });
+  const src = audio.ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audio.hit);
   src.start();
 }
 function flash() {
@@ -1688,14 +1799,7 @@ const menu = (() => {
     $("bestLine").textContent = best > 0
       ? `BEST ${best.toLocaleString("en-US")} (${rankOf(best)}) · ${c.notes.length} notes`
       : `No record · ${c.notes.length} notes`;
-    $("speedVal").textContent = settings.speed.toFixed(1);
-    const off = settings.offsetMs;
-    $("offVal").textContent = `${off > 0 ? "+" : ""}${off} ms`;
   }
-  $("speedDown").addEventListener("click", () => { settings.speed -= 0.5; refresh(); });
-  $("speedUp").addEventListener("click", () => { settings.speed += 0.5; refresh(); });
-  $("offDown").addEventListener("click", () => { settings.offsetMs -= 5; refresh(); });
-  $("offUp").addEventListener("click", () => { settings.offsetMs += 5; refresh(); });
   $("playBtn").addEventListener("click", () => {
     audio.ensure(); // unlock audio inside the tap
     const btn = $("playBtn"), s = song, c = song.charts[chartIdx];
@@ -1705,9 +1809,53 @@ const menu = (() => {
       if (game.state === "menu") startGame(s, c, data);
     });
   });
-  $("calibBtn").addEventListener("click", () => { setScreen("calib"); calib.show(); });
+  $("settingsBtn").addEventListener("click", () => prefs.open("menu"));
   refresh();
   return { refresh };
+})();
+
+// ---------------------------------------------------------------- settings
+const prefs = (() => {
+  let returnTo = "menu";
+  const sliders = [["musicVol", "musicVol"], ["hitVol", "hitVol"], ["sfxVol", "sfxVol"]];
+  function refresh() {
+    for (const [id, key] of sliders) { $(id).value = settings[key]; $(id + "Val").textContent = settings[key]; }
+    const hit = settings.hitOn;
+    $("hitOn").setAttribute("aria-pressed", String(hit)); $("hitOn").textContent = hit ? "ON" : "OFF";
+    $("hitVolRow").classList.toggle("off", !hit); $("hitVol").disabled = !hit;
+    const fs = settings.fastSlow;
+    $("fastSlowOn").setAttribute("aria-pressed", String(fs)); $("fastSlowOn").textContent = fs ? "ON" : "OFF";
+    $("speedVal").textContent = settings.speed.toFixed(1);
+    const off = settings.offsetMs;
+    $("offVal").textContent = `${off > 0 ? "+" : ""}${off} ms`;
+  }
+  for (const [id, key] of sliders) {
+    $(id).addEventListener("input", () => { settings[key] = Number($(id).value); $(id + "Val").textContent = $(id).value; });
+  }
+  $("hitVol").addEventListener("change", () => { audio.ensure(); playHit(); });
+  $("sfxVol").addEventListener("change", () => { audio.ensure(); playSfx("rankLow"); });
+  $("hitTest").addEventListener("click", () => { audio.ensure(); const on = settings.hitOn; settings.hitOn = true; playHit(); settings.hitOn = on; });
+  $("hitOn").addEventListener("click", () => { settings.hitOn = !settings.hitOn; refresh(); if (settings.hitOn) { audio.ensure(); playHit(); } });
+  $("fastSlowOn").addEventListener("click", () => { settings.fastSlow = !settings.fastSlow; refresh(); });
+  $("speedDown").addEventListener("click", () => { settings.speed -= 0.5; refresh(); });
+  $("speedUp").addEventListener("click", () => { settings.speed += 0.5; refresh(); });
+  $("offDown").addEventListener("click", () => { settings.offsetMs -= 5; refresh(); });
+  $("offUp").addEventListener("click", () => { settings.offsetMs += 5; refresh(); });
+  $("calibBtn").addEventListener("click", () => { setScreen("calib"); calib.show(); });
+  function open(from) {
+    returnTo = from;
+    // Calibration needs the audio clock, so it's only offered outside a song.
+    $("calibBtn").disabled = from === "paused";
+    $("calibBtn").textContent = from === "paused" ? "Auto sync calibration (menu only)" : "Auto sync calibration";
+    refresh(); setScreen("settings"); screens.settings.scrollTop = 0;
+  }
+  function back() {
+    if (returnTo === "paused") setScreen("paused");
+    else { setScreen("menu"); menu.refresh(); }
+  }
+  $("settingsBack").addEventListener("click", back);
+  $("pauseSettingsBtn").addEventListener("click", () => open("paused"));
+  return { open, back, refresh };
 })();
 
 // ---------------------------------------------------------------- calibration
@@ -1807,7 +1955,7 @@ const calib = (() => {
     result.textContent = `Applied. Offset is now ${fmt(settings.offsetMs)}.`;
     $("calApply").disabled = true;
   });
-  $("calBack").addEventListener("click", () => { stop(); setScreen("menu"); menu.refresh(); });
+  $("calBack").addEventListener("click", () => { stop(); prefs.open("menu"); });
   return { show, tick, tap };
 })();
 
