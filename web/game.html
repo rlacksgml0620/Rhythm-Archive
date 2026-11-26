@@ -431,7 +431,8 @@ function chartBuilder(beatSec) {
   return {
     notes,
     tap: (bar, beat, lane) => notes.push({ time: at(bar, beat), lane, duration: 0 }),
-    hold: (bar, beat, lane, beats) => notes.push({ time: at(bar, beat), lane, duration: beats * beatSec }),
+    // Holds are scored every half beat ("ticks") instead of only at the end.
+    hold: (bar, beat, lane, beats) => notes.push({ time: at(bar, beat), lane, duration: beats * beatSec, tick: beatSec / 2 }),
   };
 }
 
@@ -575,11 +576,14 @@ const ZeroArchive = (() => {
   const section = (b) => b < 4 ? "intro" : b < 12 ? "build" : b < 28 ? "dropA" : b < 36 ? "break"
     : b < 44 ? "build2" : b < 60 ? "dropB" : "outro";
   const T = (bar, beat) => (bar * 4 + beat) * BEAT;
+  // Every other 2-bar phrase is mirrored (lane -> 3 - lane) so both hands lead equally.
+  const mirrored = (bar) => Math.floor(bar / 2) % 2 === 1;
+  const mir = (r, bar) => mirrored(bar) ? r.map((l) => 3 - l) : r;
   const riffOf = (bar) => {
     const sec = section(bar);
-    if (sec === "dropA") return bar % 2 === 0 ? RIFF.A : RIFF.B;
-    if (sec === "dropB") return [RIFF.C, RIFF.D, RIFF.A, RIFF.B][bar % 4];
-    return RIFF.C;
+    if (sec === "dropA") return mir(bar % 2 === 0 ? RIFF.A : RIFF.B, bar);
+    if (sec === "dropB") return mir([RIFF.C, RIFF.D, RIFF.A, RIFF.B][bar % 4], bar);
+    return mir(RIFF.C, bar);
   };
   const breakTones = (bar) => bar % 2 === 0 ? [0, 2] : [3, 1];
 
@@ -595,7 +599,8 @@ const ZeroArchive = (() => {
       if (sec === "dropA") s.pad(T(bar, 0), 4 * b, PAD[ch], 0.03);
 
       if (sec === "intro" || isBuild) {
-        for (let st = 0; st < 16; st++) s.lead(T(bar, st * 0.25), 0.2 * b, LEAD[ch][RIFF.C[st]], sec === "intro" ? 0.07 : 0.05, true);
+        const arp = sec === "intro" ? riff : RIFF.C;
+        for (let st = 0; st < 16; st++) s.lead(T(bar, st * 0.25), 0.2 * b, LEAD[ch][arp[st]], sec === "intro" ? 0.07 : 0.05, true);
         if (sec === "intro" && bar >= 2) for (let st = 0; st < 8; st++) s.hat(T(bar, st * 0.5), 0.05);
       }
       if (isBuild) {
@@ -648,6 +653,8 @@ const ZeroArchive = (() => {
     const { notes, tap, hold } = chartBuilder(BEAT);
     for (let bar = 0; bar < BARS; bar++) {
       const sec = section(bar), riff = riffOf(bar);
+      const RA = mir(RIFF.A, bar), RB = mir(RIFF.B, bar), RD = mir(RIFF.D, bar);
+      const VB = (k) => mirrored(bar) ? 3 - VERSE[k % 8] : VERSE[k % 8];
       const streamTap = (st) => tap(bar, st * 0.25, riff[st]);
       switch (sec) {
         case "intro":
@@ -664,24 +671,24 @@ const ZeroArchive = (() => {
           const hard2 = sec === "build2";
           if (D === 0) { tap(bar, 0, bar % 2 ? 2 : 1); tap(bar, 2, bar % 2 ? 1 : 2); if (rel === 7) { tap(bar, 1, 0); tap(bar, 3, 3); } }
           else if (D === 1) {
-            for (let bt = 0; bt < 4; bt++) tap(bar, bt, VERSE[(bar * 4 + bt) % 8]);
-            if (rel >= 6) for (let bt = 0; bt < 4; bt++) tap(bar, bt + 0.5, opposite(VERSE[(bar * 4 + bt) % 8]));
+            for (let bt = 0; bt < 4; bt++) tap(bar, bt, VB(bar * 4 + bt));
+            if (rel >= 6) for (let bt = 0; bt < 4; bt++) tap(bar, bt + 0.5, opposite(VB(bar * 4 + bt)));
           } else if (D === 2) {
-            if (rel < 4) for (let bt = 0; bt < 4; bt++) tap(bar, bt, VERSE[(bar * 4 + bt) % 8]);
-            else if (rel < 7) for (let st = 0; st < 16; st += 2) { tap(bar, st * 0.25, RIFF.A[st]); if (st % 8 === 4) tap(bar, st * 0.25, opposite(RIFF.A[st])); }
-            else for (let st = 0; st < 16; st++) tap(bar, st * 0.25, RIFF.A[st]);
+            if (rel < 4) for (let bt = 0; bt < 4; bt++) tap(bar, bt, VB(bar * 4 + bt));
+            else if (rel < 7) for (let st = 0; st < 16; st += 2) { tap(bar, st * 0.25, RA[st]); if (st % 8 === 4) tap(bar, st * 0.25, opposite(RA[st])); }
+            else for (let st = 0; st < 16; st++) tap(bar, st * 0.25, RA[st]);
           } else {
             if (rel < 4) for (let st = 0; st < 16; st += 2) {
-              tap(bar, st * 0.25, RIFF.A[st]);
-              if (st % (hard2 ? 4 : 8) === 0) tap(bar, st * 0.25, opposite(RIFF.A[st]));
+              tap(bar, st * 0.25, RA[st]);
+              if (st % (hard2 ? 4 : 8) === 0) tap(bar, st * 0.25, opposite(RA[st]));
             }
             else if (rel < 6) for (let st = 0; st < 16; st++) {
               if (!hard2 && st % 2) continue;
-              tap(bar, st * 0.25, RIFF.B[st]);
-              if (st % 8 === 4) tap(bar, st * 0.25, opposite(RIFF.B[st]));
+              tap(bar, st * 0.25, RB[st]);
+              if (st % 8 === 4) tap(bar, st * 0.25, opposite(RB[st]));
             }
             else for (let st = 0; st < 16; st++) {
-              const r = rel === 6 ? RIFF.A : RIFF.D;
+              const r = rel === 6 ? RA : RD;
               tap(bar, st * 0.25, r[st]);
               if (st % 4 === 0) tap(bar, st * 0.25, opposite(r[st]));
             }
@@ -757,7 +764,8 @@ function normalize(chart) {
 }
 const isHold = (n) => n.duration > 0.05;
 const endTime = (n) => n.time + (isHold(n) ? n.duration : 0);
-const judgementCount = (c) => c.notes.reduce((s, n) => s + (isHold(n) ? 2 : 1), 0);
+const tickCount = (n) => isHold(n) ? Math.max(1, Math.floor(n.duration / (n.tick || 0.25) + 1e-6)) : 0;
+const judgementCount = (c) => c.notes.reduce((s, n) => s + 1 + tickCount(n), 0);
 const lastTime = (c) => c.notes.reduce((m, n) => Math.max(m, endTime(n)), 0);
 
 const SONGS = [NeonPulse, ZeroArchive];
@@ -959,23 +967,29 @@ function withAlpha(hex, a) {
 // ============================================================ game state
 const game = {
   state: "menu", // menu | playing | paused | result | calib
-  song: null, chart: null, notes: [], queues: [], qi: [], holding: [], spawnIdx: 0,
+  song: null, chart: null, notes: [], queues: [], qi: [], holds: [], spawnIdx: 0,
+  lastHeld: new Array(LANES).fill(-Infinity), // song time each lane was last held
   score: null, songTime: 0, lastNote: 0, endAt: 0, graceUntil: -Infinity,
   beams: new Array(LANES).fill(0), effects: [],
   judge: null, // { j, delta, at }
 };
-const pointers = new Map(); // pointerId -> lane
+// Seconds a hold may be let go (or slip off its lane) before ticks start counting as MISS.
+const HOLD_GRACE = 0.2;
+const pointers = new Map(); // pointerId -> { lane, x }
 const keyHeld = new Array(LANES).fill(false);
-const laneHeld = (lane) => keyHeld[lane] || [...pointers.values()].includes(lane);
+const laneHeld = (lane) => keyHeld[lane] || [...pointers.values()].some((p) => p.lane === lane);
+// For holds, a finger that drifted partly into the next lane still counts.
+const laneHeldLoose = (lane) => keyHeld[lane] || [...pointers.values()].some((p) => Math.abs(p.x - laneX(lane)) <= view.laneW * 0.85);
 
 function startGame(song, chart, samples) {
   const ctx = audio.ensure();
   game.song = song; game.chart = chart;
-  game.notes = chart.notes.map((n) => ({ ...n, state: "pending" }));
+  game.notes = chart.notes.map((n) => ({ ...n, state: "pending", ticksDone: 0, done: false }));
+  game.holds = game.notes.filter(isHold);
+  game.lastHeld.fill(-Infinity);
   game.queues = Array.from({ length: LANES }, () => []);
   for (const n of game.notes) game.queues[n.lane].push(n);
   game.qi = new Array(LANES).fill(0);
-  game.holding = new Array(LANES).fill(null);
   game.spawnIdx = 0;
   game.score = new Score(judgementCount(chart));
   game.lastNote = lastTime(chart);
@@ -1010,36 +1024,52 @@ function processMisses(t) {
     const q = game.queues[lane];
     while (game.qi[lane] < q.length && q[game.qi[lane]].time < t - WIN.bad) {
       const n = q[game.qi[lane]++];
-      n.state = "missed";
+      n.state = "missed"; // a missed hold head can still be grabbed for its ticks
       register(lane, J.MISS, NaN);
-      if (isHold(n)) register(lane, J.MISS, NaN);
     }
   }
 }
 
-function press(lane, t) {
-  if (game.state !== "playing") return;
-  game.beams[lane] = 0.6;
-  processMisses(t);
+function frontNote(lane, t) {
+  if (lane < 0 || lane >= LANES) return null;
   const q = game.queues[lane];
-  if (game.qi[lane] >= q.length) return;
+  if (game.qi[lane] >= q.length) return null;
   const n = q[game.qi[lane]];
-  const delta = t - n.time;
-  if (delta < -WIN.bad) return; // too early: ignore
-  game.qi[lane]++;
-  const j = evaluate(delta);
-  register(lane, j, delta);
-  if (isHold(n)) { n.state = "holding"; game.holding[lane] = n; }
-  else n.state = "hit";
+  const d = t - n.time;
+  return d < -WIN.bad ? null : { n, d }; // too early: not judged yet
 }
 
-function release(lane, t) {
+// alt = neighbouring lane when the touch landed near a lane edge (-1 if not).
+function press(lane, t, alt = -1) {
   if (game.state !== "playing") return;
-  const n = game.holding[lane];
-  if (!n || laneHeld(lane) || t < game.graceUntil) return;
-  game.holding[lane] = null;
-  if (endTime(n) - t <= WIN.good) { n.state = "hit"; register(lane, J.PERFECT, NaN); }
-  else { n.state = "missed"; register(lane, J.MISS, NaN); }
+  processMisses(t);
+  let pick = frontNote(lane, t), useLane = lane;
+  const other = frontNote(alt, t);
+  if (other && (!pick || Math.abs(other.d) + 0.03 < Math.abs(pick.d))) { pick = other; useLane = alt; }
+  game.beams[useLane] = 0.6;
+  game.lastHeld[useLane] = t;
+  if (!pick) return;
+  game.qi[useLane]++;
+  const j = evaluate(pick.d);
+  register(useLane, j, pick.d);
+  pick.n.state = "hit";
+}
+
+function judgeHoldTicks(t) {
+  for (let lane = 0; lane < LANES; lane++) if (laneHeldLoose(lane)) game.lastHeld[lane] = t;
+  for (const n of game.holds) {
+    if (n.done || t < n.time) continue;
+    const total = tickCount(n);
+    while (n.ticksDone < total) {
+      const tickAt = n.time + (n.ticksDone + 1) * (n.tick || 0.25);
+      if (tickAt > t) break;
+      const held = t - game.lastHeld[n.lane] <= HOLD_GRACE || t < game.graceUntil;
+      n.ticksDone++;
+      game.score.register(held ? J.PERFECT : J.MISS, NaN);
+      if (!held) game.judge = { j: J.MISS, delta: NaN, at: performance.now() };
+    }
+    if (n.ticksDone >= total) n.done = true;
+  }
 }
 
 function update() {
@@ -1047,12 +1077,7 @@ function update() {
   const t = songTimeNow();
   game.songTime = t;
   processMisses(t);
-  for (let lane = 0; lane < LANES; lane++) {
-    const n = game.holding[lane];
-    if (!n) continue;
-    if (t >= endTime(n)) { n.state = "hit"; game.holding[lane] = null; register(lane, J.PERFECT, NaN); }
-    else if (!laneHeld(lane) && t >= game.graceUntil) release(lane, t);
-  }
+  judgeHoldTicks(t);
   const allDone = game.score.judged >= game.score.total;
   const audioDone = conductor.audioTime() >= conductor.duration - 0.05;
   if ((allDone && audioDone && t > game.lastNote + 1) || t > game.endAt + 3) finishSong();
@@ -1101,18 +1126,21 @@ function draw() {
   while (game.spawnIdx < game.notes.length && game.notes[game.spawnIdx].time - t <= lookahead) game.spawnIdx++;
   for (let i = 0; i < game.spawnIdx; i++) {
     const n = game.notes[i];
-    if (n.state === "hit") continue;
+    const hold = isHold(n);
+    if (!hold && n.state === "hit") continue;
+    if (hold && n.done && t >= endTime(n)) continue;
     let hy = jy - (n.time - t) * pps;
     const ty = jy - (endTime(n) - t) * pps;
     if (n.state === "missed" && ty > h + 40) continue;
-    if (n.state === "holding") hy = jy;
+    const heldNow = hold && t >= n.time - WIN.bad && t - game.lastHeld[n.lane] <= HOLD_GRACE;
+    if (hold && (n.state === "hit" || t >= n.time)) hy = jy;
     const x = laneX(n.lane);
-    const dim = n.state === "missed";
+    const dim = n.state === "missed" && !heldNow;
     const color = LANE_COLORS[n.lane];
     g.globalAlpha = dim ? 0.35 : 1;
     if (isHold(n)) {
       // Hold: railed body with diagonal hatching, hollow head, short tail cap.
-      const holding = n.state === "holding";
+      const holding = heldNow;
       const bw = lw * 0.72, bx = x - bw / 2, bh = Math.max(0, hy - ty);
       g.fillStyle = withAlpha(color, holding ? 0.16 : 0.08);
       g.fillRect(bx, ty, bw, bh);
@@ -1237,21 +1265,25 @@ function frame() {
 requestAnimationFrame(frame);
 
 // ============================================================ input
+function pointerX(e) { return e.clientX - canvas.getBoundingClientRect().left; }
 canvas.addEventListener("pointerdown", (e) => {
   if (game.state !== "playing") return;
   e.preventDefault();
-  const r = canvas.getBoundingClientRect();
-  const lane = laneFromX(e.clientX - r.left);
-  pointers.set(e.pointerId, lane);
+  const x = pointerX(e);
+  const lane = laneFromX(x);
+  const frac = (x - view.left) / view.laneW - lane; // 0..1 across the lane
+  const alt = frac < 0.3 ? lane - 1 : frac > 0.7 ? lane + 1 : -1;
+  pointers.set(e.pointerId, { lane, x });
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-  press(lane, songTimeAt(e));
+  press(lane, songTimeAt(e), alt);
 });
-const endPointer = (e) => {
-  if (!pointers.has(e.pointerId)) return;
-  const lane = pointers.get(e.pointerId);
-  pointers.delete(e.pointerId);
-  release(lane, songTimeAt(e));
-};
+canvas.addEventListener("pointermove", (e) => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  p.x = pointerX(e);
+  p.lane = laneFromX(p.x);
+});
+const endPointer = (e) => { pointers.delete(e.pointerId); };
 canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("lostpointercapture", endPointer);
@@ -1275,9 +1307,7 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => {
   if (!(e.code in KEYS)) return;
-  const lane = KEYS[e.code];
-  keyHeld[lane] = false;
-  release(lane, songTimeAt(e));
+  keyHeld[KEYS[e.code]] = false;
 });
 
 // Auto-pause when the app goes to the background (home button, phone call).
@@ -1496,6 +1526,6 @@ const calib = (() => {
 setScreen("menu");
 
 // Test hook (read-only state for automated checks)
-window.__rhythm = { game, conductor, settings, press, release, songTimeNow, SONGS };
+window.__rhythm = { game, conductor, settings, press, songTimeNow, SONGS };
 })();
 </script>
