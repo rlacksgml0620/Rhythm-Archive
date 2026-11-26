@@ -292,10 +292,12 @@ button:disabled { opacity: 0.3; cursor: default; }
 // ============================================================ constants
 const LANES = 4;
 const SR = 44100;
-const WIN = { perfect: 0.045, great: 0.090, good: 0.135 };
-const J = { PERFECT: 0, GREAT: 1, GOOD: 2, MISS: 3 };
-const J_NAMES = ["PERFECT", "GREAT", "GOOD", "MISS"];
-const J_WEIGHT = [1, 0.7, 0.3, 0];
+// Judgement windows (seconds, either side of the note). Outside BAD = MISS.
+const WIN = { perfect: 0.035, great: 0.070, good: 0.105, bad: 0.140 };
+const J = { PERFECT: 0, GREAT: 1, GOOD: 2, BAD: 3, MISS: 4 };
+const J_NAMES = ["PERFECT", "GREAT", "GOOD", "BAD", "MISS"];
+const J_WEIGHT = [1, 0.75, 0.4, 0.1, 0];
+const breaksCombo = (j) => j === J.BAD || j === J.MISS;
 const css = getComputedStyle(document.documentElement);
 const C = (n) => css.getPropertyValue(n).trim();
 const COL = {
@@ -303,7 +305,7 @@ const COL = {
 };
 // Monochrome: outer lanes white, inner lanes light grey, so chords still read at a glance.
 const LANE_COLORS = [COL.fg, "#b8b8b8", "#b8b8b8", COL.fg];
-const J_COLORS = [COL.fg, "#b8b8b8", "#7c7c7c", "#4a4a4a"];
+const J_COLORS = [COL.fg, "#c8c8c8", "#9a9a9a", "#6e6e6e", "#4a4a4a"];
 const START_LEAD_IN = 3.0;
 const RESUME_REWIND = 2.0;
 
@@ -672,20 +674,18 @@ const conductor = new Conductor();
 // ============================================================ score
 class Score {
   constructor(total) {
-    this.total = Math.max(1, total); this.counts = [0, 0, 0, 0];
+    this.total = Math.max(1, total); this.counts = [0, 0, 0, 0, 0];
     this.judged = 0; this.combo = 0; this.maxCombo = 0; this.fast = 0; this.slow = 0; this.weighted = 0;
   }
   register(j, delta) {
     this.counts[j]++; this.judged++; this.weighted += J_WEIGHT[j];
-    if (j === J.MISS) this.combo = 0;
-    else {
-      this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo);
-      if (j !== J.PERFECT && Number.isFinite(delta)) { if (delta < 0) this.fast++; else this.slow++; }
-    }
+    if (j !== J.PERFECT && j !== J.MISS && Number.isFinite(delta)) { if (delta < 0) this.fast++; else this.slow++; }
+    if (breaksCombo(j)) this.combo = 0;
+    else { this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo); }
   }
   get score() { return Math.round(1e6 * this.weighted / this.total); }
   get accuracy() { return this.judged === 0 ? 100 : 100 * this.weighted / this.judged; }
-  get fullCombo() { return this.judged === this.total && this.counts[J.MISS] === 0; }
+  get fullCombo() { return this.judged === this.total && this.counts[J.MISS] === 0 && this.counts[J.BAD] === 0; }
   get allPerfect() { return this.judged === this.total && this.counts[J.PERFECT] === this.total; }
 }
 function rankOf(s) {
@@ -693,7 +693,7 @@ function rankOf(s) {
 }
 function evaluate(delta) {
   const a = Math.abs(delta);
-  return a <= WIN.perfect ? J.PERFECT : a <= WIN.great ? J.GREAT : a <= WIN.good ? J.GOOD : J.MISS;
+  return a <= WIN.perfect ? J.PERFECT : a <= WIN.great ? J.GREAT : a <= WIN.good ? J.GOOD : a <= WIN.bad ? J.BAD : J.MISS;
 }
 
 // ============================================================ canvas & layout
@@ -706,10 +706,12 @@ function resize() {
   view.w = r.width; view.h = r.height;
   canvas.width = Math.round(r.width * view.dpr);
   canvas.height = Math.round(r.height * view.dpr);
-  const fieldW = Math.min(view.w * 0.94, 440);
+  // Use (almost) the full width on phones; on wide screens cap by height so lanes stay chunky.
+  const fieldW = Math.min(view.w - 12, Math.max(480, view.h * 0.95));
   view.laneW = fieldW / LANES;
   view.left = (view.w - fieldW) / 2;
-  view.judgeY = view.h * 0.82;
+  view.judgeY = view.h * 0.80;
+  view.noteH = Math.max(20, Math.min(40, view.laneW * 0.3));
 }
 window.addEventListener("resize", resize);
 resize();
@@ -785,7 +787,7 @@ function register(lane, j, delta) {
 function processMisses(t) {
   for (let lane = 0; lane < LANES; lane++) {
     const q = game.queues[lane];
-    while (game.qi[lane] < q.length && q[game.qi[lane]].time < t - WIN.good) {
+    while (game.qi[lane] < q.length && q[game.qi[lane]].time < t - WIN.bad) {
       const n = q[game.qi[lane]++];
       n.state = "missed";
       register(lane, J.MISS, NaN);
@@ -802,7 +804,7 @@ function press(lane, t) {
   if (game.qi[lane] >= q.length) return;
   const n = q[game.qi[lane]];
   const delta = t - n.time;
-  if (delta < -WIN.good) return; // too early: ignore
+  if (delta < -WIN.bad) return; // too early: ignore
   game.qi[lane]++;
   const j = evaluate(delta);
   register(lane, j, delta);
@@ -865,15 +867,15 @@ function draw() {
 
   // judge line
   g.fillStyle = "rgba(255,255,255,0.05)";
-  g.fillRect(view.left, jy - 14, fieldW, 28);
+  g.fillRect(view.left, jy - view.noteH * 0.75, fieldW, view.noteH * 1.5);
   g.fillStyle = COL.fg;
-  g.fillRect(view.left, jy - 1, fieldW, 2);
+  g.fillRect(view.left, jy - 1.5, fieldW, 3);
   // tick marks at lane edges on the judge line
   for (let i = 0; i <= LANES; i++) g.fillRect(view.left + i * lw - 1, jy - 8, 2, 16);
 
   // notes
   const pps = pxPerSec();
-  const nh = Math.max(14, Math.min(22, h * 0.022));
+  const nh = view.noteH;
   const lookahead = (jy + nh) / pps;
   while (game.spawnIdx < game.notes.length && game.notes[game.spawnIdx].time - t <= lookahead) game.spawnIdx++;
   for (let i = 0; i < game.spawnIdx; i++) {
@@ -888,7 +890,7 @@ function draw() {
     const color = LANE_COLORS[n.lane];
     g.globalAlpha = dim ? 0.35 : 1;
     if (isHold(n)) {
-      const bw = lw * 0.6;
+      const bw = lw * 0.7;
       const by = Math.min(ty, hy);
       g.fillStyle = withAlpha(color, n.state === "holding" ? 0.45 : 0.28);
       g.fillRect(x - bw / 2, by, bw, Math.max(0, hy - ty));
@@ -897,9 +899,9 @@ function draw() {
     }
     if (hy > -nh && hy < h + nh) {
       g.fillStyle = color;
-      g.fillRect(x - lw * 0.45, hy - nh / 2, lw * 0.9, nh);
+      g.fillRect(x - lw * 0.47, hy - nh / 2, lw * 0.94, nh);
       g.fillStyle = COL.bg;
-      g.fillRect(x - lw * 0.45, hy - 1, lw * 0.9, 2); // center slit
+      g.fillRect(x - lw * 0.47, hy - 1.5, lw * 0.94, 3); // center slit
     }
     g.globalAlpha = 1;
   }
@@ -941,7 +943,7 @@ function drawHud(t) {
   if (s.combo >= 2) {
     g.textBaseline = "alphabetic";
     g.fillStyle = withAlpha(COL.fg, 0.92);
-    g.font = `900 ${Math.round(Math.min(60, w * 0.14))}px ${C("--font-display")}`;
+    g.font = `900 ${Math.round(Math.min(84, view.laneW * 0.7))}px ${C("--font-display")}`;
     g.fillText(String(s.combo), w / 2, h * 0.36);
     g.fillStyle = COL.dim;
     g.font = `400 12px ${C("--font-mono")}`;
@@ -960,7 +962,7 @@ function drawHud(t) {
       g.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
       g.textBaseline = "middle";
       g.fillStyle = J_COLORS[jd.j];
-      g.font = `900 ${Math.round(Math.min(34, w * 0.085))}px ${C("--font-display")}`;
+      g.font = `900 ${Math.round(Math.min(48, view.laneW * 0.38))}px ${C("--font-display")}`;
       g.fillText(J_NAMES[jd.j], 0, 0);
       if (jd.j !== J.PERFECT && jd.j !== J.MISS && Number.isFinite(jd.delta)) {
         g.fillStyle = COL.dim;
@@ -1099,7 +1101,7 @@ function finishSong() {
   $("resBest").textContent = newBest ? "// NEW RECORD ARCHIVED" : `// BEST ${prev.toLocaleString("en-US")}`;
   const rows = [
     ["PERFECT", s.counts[J.PERFECT]], ["GREAT", s.counts[J.GREAT]],
-    ["GOOD", s.counts[J.GOOD]], ["MISS", s.counts[J.MISS]],
+    ["GOOD", s.counts[J.GOOD]], ["BAD", s.counts[J.BAD]], ["MISS", s.counts[J.MISS]],
     ["MAX COMBO", s.maxCombo], ["FAST / SLOW", `${s.fast} / ${s.slow}`],
   ];
   const dl = $("resStats");
