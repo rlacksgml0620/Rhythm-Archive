@@ -207,9 +207,14 @@ button:disabled { opacity: 0.3; cursor: default; }
   display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 10px;
 }
 .songlist { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; overscroll-behavior: contain; }
-.songlist .song { padding: 10px; gap: 10px; flex: none; }
-.songlist .song .disc { width: 34px; height: 34px; font-size: 12px; }
-.songlist .song .t { font-size: 12px; letter-spacing: 0.06em; overflow-wrap: anywhere; }
+.songlist .song { padding: 8px; gap: 8px; flex: none; }
+.songlist .song .disc { width: 26px; height: 26px; font-size: 10px; }
+.songlist .song .t { font-size: 11px; letter-spacing: 0.02em; overflow-wrap: break-word; }
+@media (min-width: 420px) {
+  .songlist .song { padding: 10px; gap: 10px; }
+  .songlist .song .disc { width: 34px; height: 34px; font-size: 12px; }
+  .songlist .song .t { font-size: 12px; letter-spacing: 0.06em; }
+}
 .songlist .song .a { font-size: 10px; letter-spacing: 0.06em; }
 .songlist .song.empty { opacity: 0.32; cursor: default; }
 .detail { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -538,6 +543,20 @@ class Synth {
   }
   static freq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
   add(i, v) { if (i >= 0 && i < this.buf.length) this.buf[i] += v; }
+  // Gritty tap: bit-crushed noise burst over a low knock, hard-clipped.
+  crunch(t, vol) {
+    const s0 = Math.round(t * SR), n = Math.floor(0.07 * SR);
+    let held = 0, ph = 0;
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      if (i % 7 === 0) held = this.noise();          // sample-and-hold: lo-fi grit
+      const crushed = Math.round(held * 3) / 3;       // few amplitude steps
+      ph += 2 * Math.PI * (95 + 260 * Math.exp(-tt * 70)) / SR;
+      const knock = Math.sin(ph) * Math.exp(-tt * 38);
+      const x = (crushed * Math.exp(-tt * 60) * 0.9 + knock * 0.9) * 2.2;
+      this.add(s0 + i, Math.max(-1, Math.min(1, x)) * vol);
+    }
+  }
   crash(t, vol, len = 1.2) {
     const s0 = Math.round(t * SR), n = Math.floor(len * SR);
     let prev = 0;
@@ -970,6 +989,236 @@ const ZeroArchive = (() => {
   };
 })();
 
+// ---------------------------------------------------------------- archive tracks (shared song engine)
+// Each track is a short spec (tempo, key, chords, drum style, riffs, structure). The engine
+// writes the music and every difficulty's chart from the same events, so notes match sounds.
+// Lane = pitch: lead tones 0-3 run low to high.
+const SCALES = {
+  major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10],
+};
+const RIFFS = {
+  arp:    [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 3],
+  alt:    [0, 2, 1, 3, 0, 2, 1, 3, 1, 3, 0, 2, 1, 3, 0, 2],
+  zig:    [0, 3, 1, 2, 0, 3, 1, 2, 3, 0, 2, 1, 3, 0, 2, 1],
+  roll:   [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0],
+  trill:  [0, 3, 0, 3, 1, 2, 1, 2, 0, 3, 0, 3, 2, 1, 2, 1],
+  gallop: [0, -1, 0, 2, 1, -1, 1, 3, 3, -1, 3, 1, 2, -1, 2, 0],
+  tune1:  [0, -1, 2, -1, 1, -1, 3, -1, 2, -1, 1, -1, 0, -1, 1, -1],
+  tune2:  [3, -1, 2, 1, -1, 0, 1, -1, 2, -1, 3, -1, 1, 2, -1, 0],
+  tune3:  [1, -1, 3, -1, 2, 0, -1, 2, 3, -1, 1, -1, 0, 2, 1, -1],
+};
+const VERSE8 = [0, 2, 1, 3, 3, 1, 2, 0];
+const DRUMS = {
+  four:   { kick: [0, 4, 8, 12], snare: [4, 12], ghost: [], hat: [2, 6, 10, 14], hatVol: 0.09 },
+  half:   { kick: [0, 10], snare: [8], ghost: [], hat: [0, 2, 4, 6, 8, 10, 12, 14], hatVol: 0.06 },
+  trance: { kick: [0, 4, 8, 12], snare: [4, 12], ghost: [], hat: [2, 6, 10, 14], hatVol: 0.11 },
+  break:  { kick: [0, 10], snare: [4, 12], ghost: [14], hat: [0, 2, 4, 6, 8, 10, 12, 14], hatVol: 0.07 },
+  dnb:    { kick: [0, 10], snare: [4, 12], ghost: [7, 14], hat: [...Array(16).keys()], hatVol: 0.05 },
+  hard:   { kick: [0, 4, 8, 12, 14], snare: [4, 12], ghost: [], hat: [...Array(16).keys()], hatVol: 0.06 },
+};
+
+function makeSong(spec) {
+  const BEAT = 60 / spec.bpm, scale = SCALES[spec.mode];
+  const bars = [];
+  for (const [sec, n] of spec.sections) for (let r = 0; r < n; r++) bars.push({ sec, rel: r, len: n });
+  const BARS = bars.length;
+  const T = (bar, beat) => (bar * 4 + beat) * BEAT;
+  const deg = (bar) => spec.prog[bar % spec.prog.length];
+  const pitch = (d, oct) => { const i = ((d % 7) + 7) % 7, o = Math.floor(d / 7); return spec.root + scale[i] + 12 * (o + oct); };
+  const triad = (bar) => [0, 2, 4].map((k) => pitch(deg(bar) + k, 0));
+  const tones = (bar) => [0, 2, 4, 7].map((k) => pitch(deg(bar) + k, 1));
+  const bassNote = (bar) => pitch(deg(bar), -2);
+  const mirrored = (bar) => Math.floor(bar / 2) % 2 === 1;
+  const ml = (lane, bar) => (mirrored(bar) ? 3 - lane : lane);
+  const riffAt = (bar) => RIFFS[spec.riffs[bar % spec.riffs.length]].map((l, st) => (l < 0 || (spec.lead8 && st % 2) ? -1 : ml(l, bar)));
+  const verseLane = (bar, st8) => ml(VERSE8[(st8 + (bar % 4) * 2) % 8], bar);
+  const introHold = (bar) => ml(bar % 2 ? 2 : 1, bar);
+  const breakTones = (bar) => (bar % 2 === 0 ? [0, 2] : [3, 1]).map((l) => ml(l, bar));
+
+  // ---- chart: every event has a minimum difficulty (0 EASY .. 3 MASTER)
+  function chart(D, level) {
+    const notes = [];
+    const add = (bar, beat, lane, w, dur = 0, maxD = 3) => {
+      if (D < w || D > maxD) return;
+      const n = { time: T(bar, beat), lane, duration: dur * BEAT };
+      if (dur) n.tick = BEAT / 2;
+      notes.push(n);
+    };
+    bars.forEach(({ sec, rel, len }, bar) => {
+      const last = bar === BARS - 1;
+      if (sec === "intro") {
+        const hl = introHold(bar);
+        add(bar, 0, hl, 0, 2);
+        for (let st = 4; st < 16; st++) {
+          if (st % 2 && !spec.intro16) continue;
+          add(bar, st / 4, otherSide(hl, st >> (spec.intro16 ? 0 : 1)), st % 4 === 0 ? 1 : st % 2 === 0 ? 2 : 3);
+        }
+      } else if (sec === "verse") {
+        for (let st8 = 0; st8 < 8; st8++) {
+          const lane = verseLane(bar, st8);
+          add(bar, st8 / 2, lane, st8 % 4 === 0 ? 0 : st8 % 2 === 0 ? 1 : 2);
+          if (st8 === 0 || (spec.verseChords && st8 === 4)) add(bar, 0 + st8 / 2, opposite(lane), 3);
+          if (spec.verse16 && st8 % 2 === 1) add(bar, st8 / 2 + 0.25, opposite(lane), 3);
+        }
+      } else if (sec === "build") {
+        const r = RIFFS.alt.map((l) => ml(l, bar));
+        const roll = rel === len - 1;
+        for (let st = 0; st < 16; st++) {
+          if (st % 2 && !roll) continue;
+          const w = st % 8 === 0 ? 0 : st % 4 === 0 ? 1 : st % 2 === 0 ? (roll ? 1 : 2) : 2 + (spec.bpm < 140 ? 0 : 1) - (spec.bpm < 140 ? 0 : 0);
+          add(bar, st / 4, r[st], st % 2 ? (spec.bpm >= 150 ? 3 : 2) : w);
+          if (roll && st % 4 === 0) add(bar, st / 4, opposite(r[st]), 3);
+        }
+      } else if (sec === "chorus") {
+        const r = riffAt(bar);
+        for (let st = 0; st < 16; st++) {
+          if (r[st] < 0) continue;
+          add(bar, st / 4, r[st], st % 8 === 0 ? 0 : st % 4 === 0 ? 1 : st % 2 === 0 ? 2 : 3);
+          if (st % 8 === 0) add(bar, st / 4, opposite(r[st]), 2);
+          else if (st % 4 === 0) add(bar, st / 4, opposite(r[st]), 3);
+        }
+      } else if (sec === "break") {
+        const bt = breakTones(bar);
+        for (let k = 0; k < 2; k++) {
+          add(bar, k * 2, bt[k], 0, 1.5);
+          for (let q = 1; q < 8; q++) {
+            const o = q / 4; // 16th offsets after the hold starts
+            add(bar, k * 2 + o, otherSide(bt[k], q), q === 4 ? 1 : q % 2 === 0 ? 2 : 3);
+          }
+        }
+      } else if (sec === "outro") {
+        if (!last) { add(bar, 0, 1, 0, 3, 0); add(bar, 0, 0, 1, 3); add(bar, 0, 3, 1, 3); }
+        else { add(bar, 0, 1, 0); add(bar, 0, 2, 1); }
+      }
+    });
+    return normalize({ difficulty: DIFFS[D], level, notes });
+  }
+
+  // ---- music
+  function* render() {
+    const s = new Synth(BARS * 4 * BEAT + 2.5), b = BEAT, dr = DRUMS[spec.drums], vdr = DRUMS[spec.verseDrums || spec.drums];
+    const drumBar = (bar, kit, hatMul = 1) => {
+      kit.kick.forEach((st) => s.kick(T(bar, st / 4), spec.kickVol || 0.9));
+      kit.snare.forEach((st) => s.snare(T(bar, st / 4), 0.42));
+      kit.ghost.forEach((st) => s.snare(T(bar, st / 4), 0.14));
+      kit.hat.forEach((st) => s.hat(T(bar, st / 4), kit.hatVol * hatMul * (st % 2 ? 0.7 : 1)));
+    };
+    const bassBar = (bar) => {
+      const bn = bassNote(bar);
+      if (spec.bass === "offbeat") for (let bt = 0; bt < 4; bt++) s.bass(T(bar, bt + 0.5), 0.4 * b, bn + 12, 0.3);
+      else if (spec.bass === "sixteenth") for (let st = 0; st < 16; st++) s.bass(T(bar, st / 4), 0.2 * b, bn + (st % 4 === 2 ? 12 : 0), 0.24);
+      else for (let st = 0; st < 8; st++) s.bass(T(bar, st / 2), 0.45 * b, bn + (st % 2 ? 12 : 0), 0.27);
+    };
+    const pluck = (bar, beat, tone, vol = 0.08, len = 0.4) => s.lead(T(bar, beat), len * b, tones(bar)[tone], vol, true);
+
+    for (let bar = 0; bar < BARS; bar++) {
+      const { sec, rel, len } = bars[bar], last = bar === BARS - 1, tn = tones(bar);
+      if (!last) s.pad(T(bar, 0), 4 * b, triad(bar), sec === "chorus" ? 0.03 : 0.05);
+      switch (sec) {
+        case "intro": {
+          const hl = introHold(bar);
+          s.lead(T(bar, 0), 2 * b, tn[hl], 0.14, true);
+          for (let st = 4; st < 16; st += spec.intro16 ? 1 : 2) pluck(bar, st / 4, otherSide(hl, st >> (spec.intro16 ? 0 : 1)), 0.06, 0.25);
+          if (rel >= 2) for (let st = 0; st < 8; st++) s.hat(T(bar, st / 2), 0.05);
+          break;
+        }
+        case "verse":
+          drumBar(bar, vdr);
+          bassBar(bar);
+          for (let st8 = 0; st8 < 8; st8++) {
+            const lane = verseLane(bar, st8);
+            pluck(bar, st8 / 2, lane, st8 % 2 ? 0.05 : 0.07, 0.35);
+            if (st8 === 0) pluck(bar, 0, opposite(lane), 0.05, 0.35);
+            if (spec.verse16 && st8 % 2) pluck(bar, st8 / 2 + 0.25, opposite(lane), 0.04, 0.2);
+          }
+          break;
+        case "build": {
+          drumBar(bar, vdr, 0.8);
+          bassBar(bar);
+          const r = RIFFS.alt.map((l) => ml(l, bar)), roll = rel === len - 1;
+          for (let st = 0; st < 16; st += roll ? 1 : 2) pluck(bar, st / 4, r[st], 0.06, 0.2);
+          if (rel === len - 2) for (let st = 0; st < 8; st++) s.snare(T(bar, st / 2), 0.18 + st * 0.03);
+          if (roll) for (let st = 0; st < 16; st++) s.snare(T(bar, st / 4), 0.15 + st * 0.02);
+          break;
+        }
+        case "chorus": {
+          drumBar(bar, dr);
+          bassBar(bar);
+          const r = riffAt(bar);
+          for (let st = 0; st < 16; st++) {
+            if (r[st] < 0) continue;
+            s.lead(T(bar, st / 4), (spec.lead8 ? 0.45 : 0.22) * b, tn[r[st]], 0.1);
+            if (st % 4 === 0) s.lead(T(bar, st / 4), 0.2 * b, tn[opposite(r[st])], 0.04);
+          }
+          if (rel === len - 1 && bars[bar + 1] && bars[bar + 1].sec !== "chorus") s.crash(T(bar + 1, 0), 0.08, 1.2);
+          break;
+        }
+        case "break": {
+          s.bass(T(bar, 0), 3.8 * b, bassNote(bar), 0.2);
+          for (let st = 0; st < 16; st++) s.hat(T(bar, st / 4), st % 2 ? 0.025 : 0.04, 50);
+          const bt = breakTones(bar);
+          for (let k = 0; k < 2; k++) {
+            s.lead(T(bar, k * 2), 1.8 * b, tn[bt[k]], 0.14, true);
+            for (let q = 2; q < 8; q += 2) pluck(bar, k * 2 + q / 4, otherSide(bt[k], q), 0.04, 0.2);
+          }
+          break;
+        }
+        case "outro":
+          if (!last) {
+            s.kick(T(bar, 0), 0.9); s.kick(T(bar, 2), 0.9);
+            s.bass(T(bar, 0), 3.8 * b, bassNote(bar), 0.22);
+            [0, 1, 3].forEach((l) => s.lead(T(bar, 0), 3 * b, tn[l], 0.09, true));
+          } else {
+            s.kick(T(bar, 0), 1); s.snare(T(bar, 0), 0.4); s.crash(T(bar, 0), 0.12, 1.6);
+            s.bass(T(bar, 0), 2 * b, bassNote(0), 0.25);
+            s.pad(T(bar, 0), 2 * b, triad(0), 0.06);
+            [1, 2].forEach((l) => s.lead(T(bar, 0), 2 * b, tones(0)[l], 0.13, true));
+          }
+          break;
+      }
+      yield;
+    }
+    return s.finish();
+  }
+
+  const pv = spec.sections.findIndex(([sec]) => sec === "chorus");
+  const pvBar = spec.sections.slice(0, pv).reduce((a, [, n]) => a + n, 0);
+  return {
+    id: spec.id, title: spec.title, artist: "Rhythm Archive", bpm: spec.bpm, boss: false,
+    preview: { bar: pvBar, bars: Math.min(8, spec.sections[pv][1]) },
+    charts: spec.levels.map((lv, D) => chart(D, lv)),
+    render,
+  };
+}
+
+const ARCHIVE_TRACKS = [
+  { id: "trk_static_bloom", title: "Static Bloom", bpm: 122, mode: "major", root: 60, prog: [0, 4, 5, 3],
+    drums: "four", bass: "offbeat", lead8: false, riffs: ["tune1", "alt"],
+    sections: [["intro", 4], ["verse", 8], ["chorus", 8], ["break", 4], ["build", 2], ["chorus", 8], ["outro", 2]], levels: [2, 6, 10, 14] },
+  { id: "trk_paper_satellites", title: "Paper Satellites", bpm: 108, mode: "major", root: 62, prog: [0, 5, 3, 4],
+    drums: "half", bass: "eighth", lead8: false, riffs: ["tune3", "arp"], verseChords: true,
+    sections: [["intro", 4], ["verse", 8], ["break", 4], ["chorus", 8], ["break", 4], ["chorus", 4], ["outro", 2]], levels: [3, 6, 10, 14] },
+  { id: "trk_glass_protocol", title: "Glass Protocol", bpm: 136, mode: "minor", root: 57, prog: [0, 5, 2, 6],
+    drums: "trance", bass: "offbeat", lead8: false, riffs: ["alt", "tune2"],
+    sections: [["intro", 4], ["verse", 8], ["build", 2], ["chorus", 8], ["break", 4], ["build", 2], ["chorus", 8], ["outro", 2]], levels: [3, 7, 11, 15] },
+  { id: "trk_rust_cathedral", title: "Rust Cathedral", bpm: 150, mode: "minor", root: 55, prog: [0, 5, 6, 4],
+    drums: "four", verseDrums: "half", bass: "eighth", lead8: false, riffs: ["gallop", "tune3"], verseChords: true, kickVol: 1,
+    sections: [["intro", 4], ["verse", 8], ["build", 2], ["chorus", 8], ["break", 4], ["chorus", 8], ["outro", 2]], levels: [4, 8, 12, 16] },
+  { id: "trk_cold_index", title: "Cold Index", bpm: 158, mode: "dorian", root: 62, prog: [0, 3, 6, 4],
+    drums: "break", bass: "eighth", lead8: false, riffs: ["alt", "zig"],
+    sections: [["intro", 4], ["verse", 8], ["build", 2], ["chorus", 8], ["break", 4], ["build", 2], ["chorus", 8], ["outro", 2]], levels: [4, 8, 13, 16] },
+  { id: "trk_night_ledger", title: "Night Ledger", bpm: 164, mode: "phrygian", root: 64, prog: [0, 1, 5, 6],
+    drums: "dnb", verseDrums: "break", bass: "eighth", lead8: false, riffs: ["zig", "alt", "gallop"], verse16: true,
+    sections: [["intro", 4], ["verse", 8], ["build", 2], ["chorus", 8], ["break", 4], ["build", 2], ["chorus", 8], ["outro", 2]], levels: [5, 9, 14, 17] },
+  { id: "trk_hex_garden", title: "Hex Garden", bpm: 170, mode: "minor", root: 59, prog: [0, 5, 3, 4],
+    drums: "dnb", bass: "sixteenth", lead8: false, riffs: ["roll", "trill"], intro16: true, verseChords: true,
+    sections: [["intro", 4], ["verse", 8], ["build", 2], ["chorus", 8], ["break", 4], ["build", 2], ["chorus", 8], ["outro", 2]], levels: [5, 10, 15, 18] },
+  { id: "trk_last_mirror", title: "Last Mirror", bpm: 176, mode: "minor", root: 61, prog: [0, 6, 5, 4],
+    drums: "hard", verseDrums: "dnb", bass: "sixteenth", lead8: false, riffs: ["trill", "zig", "roll", "alt"], intro16: true, verseChords: true,
+    sections: [["intro", 4], ["verse", 8], ["build", 2], ["chorus", 8], ["break", 4], ["build", 2], ["chorus", 8], ["outro", 2]], levels: [5, 10, 15, 19] },
+].map(makeSong);
+
 function clickTrack(bpm, beats) {
   const beat = 60 / bpm, s = new Synth(beats * beat + 0.5);
   for (let i = 0; i < beats; i++) s.click(i * beat, i % 4 === 0 ? 0.9 : 0.6, i % 4 === 0 ? 1760 : 1320);
@@ -996,7 +1245,7 @@ const tickCount = (n) => isHold(n) ? Math.max(1, Math.floor(n.duration / (n.tick
 const judgementCount = (c) => c.notes.reduce((s, n) => s + 1 + tickCount(n), 0);
 const lastTime = (c) => c.notes.reduce((m, n) => Math.max(m, endTime(n)), 0);
 
-const SONGS = [NeonPulse, ZeroArchive];
+const SONGS = [NeonPulse, ...ARCHIVE_TRACKS, ZeroArchive]; // easiest first, boss last
 
 // ============================================================ audio
 const audio = {
@@ -1034,27 +1283,38 @@ const audio = {
   },
 };
 
-// Songs are synthesized in small slices between frames so the menu stays responsive.
+// Songs are synthesized on demand, in small slices between frames so the screen stays responsive.
+// Only the most recent few are kept in memory (each is ~14 MB of audio).
 const sampleJobs = new Map();
+const MAX_CACHED_SONGS = 3;
 function samplesFor(song) {
-  if (!sampleJobs.has(song.id)) {
-    sampleJobs.set(song.id, new Promise((resolve) => {
-      const it = song.render();
-      const step = () => {
-        const t0 = performance.now();
-        while (performance.now() - t0 < 10) {
-          const r = it.next();
-          if (r.done) { resolve(r.value); return; }
-        }
-        setTimeout(step, 0);
-      };
-      setTimeout(step, 0);
-    }));
+  if (sampleJobs.has(song.id)) {
+    const job = sampleJobs.get(song.id);
+    sampleJobs.delete(song.id); sampleJobs.set(song.id, job); // mark as recently used
+    return job;
   }
-  return sampleJobs.get(song.id);
+  const job = new Promise((resolve) => {
+    const it = song.render();
+    const step = () => {
+      const t0 = performance.now();
+      while (performance.now() - t0 < 10) {
+        const r = it.next();
+        if (r.done) {
+          const ctx = audio.ctx || audio.ensure();
+          const buf = ctx.createBuffer(1, r.value.length, SR);
+          buf.getChannelData(0).set(r.value);
+          resolve(buf);
+          return;
+        }
+      }
+      setTimeout(step, 0);
+    };
+    setTimeout(step, 0);
+  });
+  sampleJobs.set(song.id, job);
+  while (sampleJobs.size > MAX_CACHED_SONGS) sampleJobs.delete(sampleJobs.keys().next().value);
+  return job;
 }
-// Pre-render every song in the background, one after another.
-setTimeout(() => SONGS.reduce((p, song) => p.then(() => samplesFor(song)), Promise.resolve()), 300);
 
 // ============================================================ conductor (audio clock)
 class Conductor {
@@ -1235,7 +1495,7 @@ function startGame(song, chart, samples) {
   game.graceUntil = -Infinity;
   game.effects = []; game.beams.fill(0); game.judge = null;
   pointers.clear(); keyHeld.fill(false);
-  const buf = audio.buffer(song.id, () => samples);
+  const buf = samples;
   game.endAt = Math.max(game.lastNote, buf.duration);
   conductor.play(buf, START_LEAD_IN);
   setScreen("playing");
@@ -1664,10 +1924,9 @@ function playSfx(name) {
 // Short dry click for taps.
 function playHit() {
   if (!audio.ctx || !settings.hitOn) return;
-  const buf = audio.buffer("sfx-hit", () => {
+  const buf = audio.buffer("sfx-hit-crunch", () => {
     const s = new Synth(0.08);
-    s.click(0, 0.9, 1900);
-    s.hat(0, 0.35, 140);
+    s.crunch(0, 1);
     return s.finish();
   });
   const src = audio.ctx.createBufferSource();
@@ -1838,7 +2097,7 @@ const preview = (() => {
     setChart(c);
     samplesFor(sg).then((data) => {
       if (song !== sg || game.state !== "menu" || !audio.ctx) return;
-      const ctx = audio.ctx, buf = audio.buffer(sg.id, () => data), now = ctx.currentTime;
+      const ctx = audio.ctx, buf = data, now = ctx.currentTime;
       gain = ctx.createGain();
       gain.gain.setValueAtTime(0, now);
       gain.gain.linearRampToValueAtTime(1, now + 0.6);
