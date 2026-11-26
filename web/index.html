@@ -197,6 +197,52 @@ button:disabled { opacity: 0.3; cursor: default; }
 .slot .v { font-size: 12px; color: var(--fg); }
 .slot.now { border-color: var(--fg); }
 .slot.off .v { color: var(--mute); text-decoration: line-through; }
+/* ---- home ---- */
+.home-top { width: 100%; max-width: 980px; margin-inline: auto; }
+.home-title { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
+.home-title h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 900; line-height: 0.96; letter-spacing: 0.04em;
+  font-size: clamp(40px, 12.5vw, 128px); text-wrap: balance;
+}
+.home-title .rule { width: min(72%, 460px); height: 2px; background: var(--fg); }
+.home-title p { margin: 0; font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); }
+.cursor { display: inline-block; width: 0.6em; height: 1em; background: var(--fg); vertical-align: -0.15em; margin-left: 4px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.home-actions { width: 100%; max-width: 360px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+/* ---- song select ---- */
+#menu { overflow: hidden; }
+.select-head { width: 100%; max-width: 980px; margin-inline: auto; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.select-head h2 { margin: 0; text-align: center; font-family: var(--font-display); font-weight: 900; font-size: 16px; letter-spacing: 0.2em; }
+.head-btn { height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 0.14em; }
+.head-btn:active { background: var(--fg); color: var(--ink); }
+.select-body {
+  flex: 1; min-height: 0; width: 100%; max-width: 980px; margin: 14px auto 0;
+  display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 10px;
+}
+.songlist { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; overscroll-behavior: contain; }
+.songlist .song { padding: 10px; gap: 10px; flex: none; }
+.songlist .song .disc { width: 34px; height: 34px; font-size: 12px; }
+.songlist .song .t { font-size: 12px; letter-spacing: 0.06em; overflow-wrap: anywhere; }
+.songlist .song .a { font-size: 10px; letter-spacing: 0.06em; }
+.songlist .song.empty { opacity: 0.32; cursor: default; }
+.detail { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.detail-title { display: flex; flex-direction: column; gap: 2px; }
+.detail-title .t { font-family: var(--font-display); font-weight: 900; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; overflow-wrap: anywhere; }
+.detail-title .a { font-size: 11px; letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; }
+.preview-box { flex: 1; min-height: 170px; position: relative; border: 1px solid var(--line); background: var(--field); }
+#previewCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.preview-tag { position: absolute; top: 6px; left: 8px; font-size: 10px; letter-spacing: 0.2em; color: var(--dim); pointer-events: none; }
+.detail .diffs { grid-template-columns: 1fr 1fr; }
+.detail .diff { padding: 8px 4px; }
+.detail .diff .lv { font-size: 18px; }
+.detail .btn.primary { height: 56px; font-size: 18px; }
+@media (min-width: 720px) {
+  .songlist .song .t { font-size: 15px; }
+  .songlist .song .a { font-size: 11px; }
+  .detail-title .t { font-size: 22px; }
+}
+
 /* ---- settings ---- */
 .setting {
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 12px;
@@ -280,30 +326,45 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
   <canvas id="stage" aria-label="Rhythm game playfield"></canvas>
   <button id="pauseBtn" type="button" aria-label="Pause" hidden>II</button>
 
-  <!-- MENU -->
-  <section id="menu" class="screen solid" aria-label="Song select">
-    <div class="col">
-      <div class="brand">
-        <div class="sys"><span>SYS.ARCHIVE</span><span>v0.2 // ONLINE</span></div>
-        <h1>RHYTHM<br>ARCHIVE</h1>
-        <p>4-lane rhythm terminal. Hit the notes on the line.</p>
-      </div>
+  <!-- HOME -->
+  <section id="home" class="screen solid" aria-label="Home">
+    <div class="home-top">
+      <div class="sys"><span>SYS.ARCHIVE</span><span>v0.3 // ONLINE</span></div>
+    </div>
+    <div class="home-title">
+      <h1>RHYTHM<br>ARCHIVE</h1>
+      <div class="rule"></div>
+      <p>4-lane rhythm terminal<span class="cursor" aria-hidden="true"></span></p>
+    </div>
+    <div class="home-actions">
+      <button type="button" class="btn primary" id="homePlay">PLAY</button>
+      <button type="button" class="btn" id="settingsBtn">Settings</button>
+      <p class="hint">No sound on iPhone? Check volume and silent switch.<br>Keyboard: D / F / J / K</p>
+    </div>
+  </section>
 
-      <div class="group">
-        <span class="label">Songs</span>
-        <div class="songs" id="songList"></div>
-      </div>
-
-      <div class="group">
-        <span class="label">Difficulty</span>
+  <!-- SONG SELECT -->
+  <section id="menu" class="screen solid" aria-label="Song select" hidden>
+    <div class="select-head">
+      <button type="button" class="head-btn" id="selectBack">&lt; HOME</button>
+      <h2>SONG SELECT</h2>
+      <button type="button" class="head-btn" id="selectSettings">SETTINGS</button>
+    </div>
+    <div class="select-body">
+      <div class="songlist" id="songList" aria-label="Songs"></div>
+      <div class="detail">
+        <div class="detail-title">
+          <span class="t" id="detailTitle"></span>
+          <span class="a" id="detailMeta"></span>
+        </div>
+        <div class="preview-box">
+          <canvas id="previewCanvas" aria-label="Chart preview"></canvas>
+          <span class="preview-tag">// PREVIEW</span>
+        </div>
         <div class="diffs" id="diffList"></div>
         <div class="best" id="bestLine"></div>
+        <button type="button" class="btn primary" id="playBtn">START</button>
       </div>
-
-      <button type="button" class="btn" id="settingsBtn">Settings</button>
-
-      <button type="button" class="btn primary" id="playBtn">PLAY</button>
-      <p class="hint">No sound on iPhone? Check volume and silent switch.<br>Keyboard: D / F / J / K</p>
     </div>
   </section>
 
@@ -735,6 +796,7 @@ const NeonPulse = (() => {
 
   return {
     id: "demo_neon_pulse", title: "Neon Pulse", artist: "Rhythm Archive", bpm: BPM, boss: false,
+    preview: { bar: 12, bars: 8 }, // first chorus
     charts: [chart("EASY", 2), chart("NORMAL", 5), chart("HARD", 9), chart("MASTER", 13)],
     render,
   };
@@ -918,6 +980,7 @@ const ZeroArchive = (() => {
 
   return {
     id: "boss_zero_archive", title: "ZERO//ARCHIVE", artist: "Rhythm Archive", bpm: BPM, boss: true,
+    preview: { bar: 12, bars: 8 }, // first drop
     charts: [chart("EASY", 6), chart("NORMAL", 11), chart("HARD", 16), chart("MASTER", 20)],
     render,
   };
@@ -1158,7 +1221,7 @@ function withAlpha(hex, a) {
 
 // ============================================================ game state
 const game = {
-  state: "menu", // menu | playing | paused | result | calib
+  state: "home", // home | menu (song select) | playing | paused | finale | result | settings | calib
   song: null, chart: null, notes: [], queues: [], qi: [], holds: [], spawnIdx: 0,
   lastHeld: new Array(LANES).fill(-Infinity), // song time each lane was last held
   score: null, songTime: 0, lastNote: 0, endAt: 0, graceUntil: -Infinity,
@@ -1453,6 +1516,7 @@ function frame() {
   update();
   draw();
   if (game.state === "calib") calib.tick();
+  if (game.state === "menu") preview.draw();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -1487,6 +1551,7 @@ const KEYS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
 window.addEventListener("keydown", (e) => {
   if (e.code === "Escape") {
     if (game.state === "settings") { prefs.back(); return; }
+    if (game.state === "menu") { setScreen("home"); return; }
     if (game.state === "playing") pauseGame();
     else if (game.state === "paused") resumeGame();
     return;
@@ -1516,9 +1581,11 @@ async function requestWakeLock() {
 
 // ============================================================ screens
 const $ = (id) => document.getElementById(id);
-const screens = { menu: $("menu"), pause: $("pause"), result: $("result"), calib: $("calib"), settings: $("settings") };
+const screens = { home: $("home"), menu: $("menu"), pause: $("pause"), result: $("result"), calib: $("calib"), settings: $("settings") };
 function setScreen(s) {
   game.state = s;
+  if (s !== "menu") preview.stop();
+  screens.home.hidden = s !== "home";
   screens.menu.hidden = s !== "menu";
   screens.pause.hidden = s !== "paused";
   screens.result.hidden = s !== "result";
@@ -1546,8 +1613,7 @@ function quitToMenu() {
   clearReveal();
   conductor.stop();
   game.score = null;
-  setScreen("menu");
-  menu.refresh();
+  menu.open();
 }
 function retry() { clearReveal(); conductor.stop(); samplesFor(game.song).then((data) => startGame(game.song, game.chart, data)); }
 
@@ -1761,28 +1827,145 @@ $("resRetry").addEventListener("click", retry);
 $("resMenu").addEventListener("click", quitToMenu);
 
 // ---------------------------------------------------------------- menu
+// ---------------------------------------------------------------- song preview (select screen)
+const preview = (() => {
+  const cv = $("previewCanvas"), pg = cv.getContext("2d");
+  let song = null, chart = null, src = null, gain = null, t0 = 0, start = 0, len = 0, ready = false, loopNotes = [];
+  function window_(sg) { const spb = 60 / sg.bpm; return [sg.preview.bar * 4 * spb, sg.preview.bars * 4 * spb]; }
+  function setChart(c) {
+    chart = c;
+    loopNotes = c.notes.filter((n) => n.time >= start && n.time < start + len);
+  }
+  function stopAudio(fade = 0.25) {
+    if (!src || !audio.ctx) { src = null; return; }
+    const now = audio.ctx.currentTime, s0 = src, g0 = gain;
+    g0.gain.cancelScheduledValues(now);
+    g0.gain.setValueAtTime(g0.gain.value, now);
+    g0.gain.linearRampToValueAtTime(0, now + fade);
+    try { s0.stop(now + fade + 0.02); } catch (e) { /* already stopped */ }
+    setTimeout(() => { try { s0.disconnect(); g0.disconnect(); } catch (e) { /* ignore */ } }, (fade + 0.1) * 1000);
+    src = null;
+  }
+  function play(sg, c) {
+    if (song === sg && src) { setChart(c); return; }
+    stopAudio();
+    song = sg; ready = false;
+    [start, len] = window_(sg);
+    setChart(c);
+    samplesFor(sg).then((data) => {
+      if (song !== sg || game.state !== "menu" || !audio.ctx) return;
+      const ctx = audio.ctx, buf = audio.buffer(sg.id, () => data), now = ctx.currentTime;
+      gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(1, now + 0.6);
+      gain.connect(audio.out);
+      src = ctx.createBufferSource();
+      src.buffer = buf; src.loop = true; src.loopStart = start; src.loopEnd = start + len;
+      src.connect(gain);
+      t0 = now + 0.05;
+      src.start(t0, start);
+      ready = true;
+    });
+  }
+  function stop() { stopAudio(); song = null; ready = false; }
+  function draw() {
+    const r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 3);
+    if (!r.width || !r.height) return;
+    const W = Math.round(r.width * d), H = Math.round(r.height * d);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const w = r.width, h = r.height;
+    pg.setTransform(d, 0, 0, d, 0, 0);
+    pg.fillStyle = COL.field; pg.fillRect(0, 0, w, h);
+    const left = 8, lw = (w - 16) / LANES, jy = h * 0.86, nh = Math.max(8, Math.min(18, lw * 0.26));
+    pg.fillStyle = COL.line;
+    for (let i = 0; i <= LANES; i++) pg.fillRect(left + i * lw - 0.5, 0, 1, h);
+    if (!ready || !audio.ctx) {
+      pg.fillStyle = COL.dim; pg.font = `400 11px ${C("--font-mono")}`; pg.textAlign = "center"; pg.textBaseline = "middle";
+      pg.fillText(audio.ctx ? "LOADING…" : "TAP A SONG", w / 2, h / 2);
+      drawLine(); return;
+    }
+    let rel = audio.ctx.currentTime - t0;
+    rel = rel < 0 ? 0 : rel % len;
+    const pps = settings.speed * h * 0.2;
+    const beams = new Array(LANES).fill(0);
+    const rings = [];
+    for (const n of loopNotes) {
+      let dt = (n.time - start) - rel;
+      const dur = isHold(n) ? n.duration : 0;
+      if (dt + dur < -0.25) dt += len;
+      if (dt > (jy + nh) / pps) continue;
+      const x = left + lw * (n.lane + 0.5), color = LANE_COLORS[n.lane];
+      if (dur) {
+        if (dt + dur < 0) continue;
+        const hy = dt < 0 ? jy : jy - dt * pps, ty = jy - (dt + dur) * pps, bw = lw * 0.7;
+        pg.fillStyle = withAlpha(color, dt < 0 ? 0.35 : 0.18); pg.fillRect(x - bw / 2, ty, bw, hy - ty);
+        pg.fillStyle = color; pg.fillRect(x - bw / 2, ty, 2, hy - ty); pg.fillRect(x + bw / 2 - 2, ty, 2, hy - ty);
+        pg.fillRect(x - lw * 0.4, ty - 2, lw * 0.8, 4);
+        pg.strokeStyle = color; pg.lineWidth = 3; pg.strokeRect(x - lw * 0.45 + 1.5, hy - nh / 2 + 1.5, lw * 0.9 - 3, nh - 3);
+        if (dt < 0) beams[n.lane] = Math.max(beams[n.lane], 0.5);
+        if (dt <= 0 && dt > -0.2) rings.push([n.lane, -dt / 0.2]);
+      } else {
+        if (dt < -0.2) continue;
+        if (dt <= 0) { beams[n.lane] = Math.max(beams[n.lane], 1 + dt / 0.2); rings.push([n.lane, -dt / 0.2]); continue; }
+        const y = jy - dt * pps;
+        pg.fillStyle = color; pg.fillRect(x - lw * 0.45, y - nh / 2, lw * 0.9, nh);
+        pg.fillStyle = COL.bg; pg.fillRect(x - lw * 0.45, y - 1, lw * 0.9, 2);
+      }
+    }
+    beams.forEach((a, i) => { if (a > 0.01) { pg.fillStyle = withAlpha(COL.fg, a * 0.18); pg.fillRect(left + i * lw + 1, jy - h * 0.3, lw - 2, h * 0.3); } });
+    for (const [lane, k] of rings) {
+      const rr2 = lw * (0.25 + 0.25 * k);
+      pg.strokeStyle = withAlpha(COL.fg, 1 - k); pg.lineWidth = 2;
+      pg.strokeRect(left + lw * (lane + 0.5) - rr2, jy - rr2, rr2 * 2, rr2 * 2);
+    }
+    drawLine();
+    function drawLine() {
+      pg.fillStyle = COL.fg; pg.fillRect(left, jy - 1, lw * LANES, 2);
+      for (let i = 0; i <= LANES; i++) pg.fillRect(left + i * lw - 1, jy - 5, 2, 10);
+    }
+  }
+  return { play, stop, draw, setChart };
+})();
+
+// ---------------------------------------------------------------- song select
 const menu = (() => {
   let song = SONGS[0], chartIdx = 1;
+  const SLOTS = 12; // empty archive slots fill the rest of the list
   const list = $("songList"), diffs = $("diffList");
   function buildSongs() {
     list.replaceChildren();
-    for (const s of SONGS) {
+    for (let i = 0; i < Math.max(SLOTS, SONGS.length); i++) {
+      const s = SONGS[i];
       const b = document.createElement("button");
-      b.type = "button"; b.className = s.boss ? "song boss" : "song";
-      b.setAttribute("aria-pressed", String(s === song));
-      const disc = document.createElement("span"); disc.className = "disc";
-      disc.textContent = String(SONGS.indexOf(s) + 1).padStart(2, "0");
+      b.type = "button";
+      const disc = document.createElement("span"); disc.className = "disc"; disc.textContent = String(i + 1).padStart(2, "0");
       const meta = document.createElement("span"); meta.className = "meta";
-      const tt = document.createElement("span"); tt.className = "t"; tt.textContent = s.title;
+      const tt = document.createElement("span"); tt.className = "t";
       const a = document.createElement("span"); a.className = "a";
-      a.textContent = `${s.boss ? "[BOSS] " : ""}${s.bpm} BPM · MAX Lv.${Math.max(...s.charts.map((c) => c.level))}`;
       meta.append(tt, a); b.append(disc, meta);
-      b.addEventListener("click", () => { if (song !== s) { song = s; chartIdx = Math.min(1, s.charts.length - 1); } refresh(); });
+      if (!s) {
+        b.className = "song empty"; b.disabled = true;
+        tt.textContent = "NO DATA"; a.textContent = "// SLOT EMPTY";
+      } else {
+        b.className = s.boss ? "song boss" : "song";
+        b.setAttribute("aria-pressed", String(s === song));
+        tt.textContent = s.title.replace("//", "//​");
+        a.textContent = `${s.boss ? "BOSS · " : ""}MAX Lv.${Math.max(...s.charts.map((c) => c.level))}`;
+        b.addEventListener("click", () => select(s));
+      }
       list.append(b);
     }
   }
+  function select(s) {
+    audio.ensure();
+    if (song !== s) { song = s; chartIdx = Math.min(1, s.charts.length - 1); }
+    refresh();
+    preview.play(song, song.charts[chartIdx]);
+  }
   function refresh() {
-    buildSongs();
+    [...list.querySelectorAll(".song:not(.empty)")].forEach((b, i) => b.setAttribute("aria-pressed", String(SONGS[i] === song)));
+    $("detailTitle").textContent = song.title.replace("//", "//​");
+    $("detailMeta").textContent = `${song.artist} · ${song.bpm} BPM`;
     diffs.replaceChildren();
     song.charts.forEach((c, i) => {
       const b = document.createElement("button");
@@ -1791,7 +1974,7 @@ const menu = (() => {
       const n = document.createElement("span"); n.className = "n"; n.textContent = c.difficulty;
       const lv = document.createElement("span"); lv.className = "lv"; lv.textContent = `Lv.${c.level}`;
       b.append(n, lv);
-      b.addEventListener("click", () => { chartIdx = i; refresh(); });
+      b.addEventListener("click", () => { chartIdx = i; refresh(); preview.setChart(song.charts[chartIdx]); });
       diffs.append(b);
     });
     const c = song.charts[chartIdx];
@@ -1800,18 +1983,26 @@ const menu = (() => {
       ? `BEST ${best.toLocaleString("en-US")} (${rankOf(best)}) · ${c.notes.length} notes`
       : `No record · ${c.notes.length} notes`;
   }
+  function open() {
+    setScreen("menu");
+    refresh();
+    if (audio.ctx) preview.play(song, song.charts[chartIdx]);
+  }
   $("playBtn").addEventListener("click", () => {
     audio.ensure(); // unlock audio inside the tap
     const btn = $("playBtn"), s = song, c = song.charts[chartIdx];
     btn.disabled = true; btn.textContent = "LOADING";
     samplesFor(s).then((data) => {
-      btn.disabled = false; btn.textContent = "PLAY";
+      btn.disabled = false; btn.textContent = "START";
       if (game.state === "menu") startGame(s, c, data);
     });
   });
-  $("settingsBtn").addEventListener("click", () => prefs.open("menu"));
-  refresh();
-  return { refresh };
+  $("selectBack").addEventListener("click", () => setScreen("home"));
+  $("selectSettings").addEventListener("click", () => prefs.open("menu"));
+  $("homePlay").addEventListener("click", () => { audio.ensure(); open(); });
+  $("settingsBtn").addEventListener("click", () => prefs.open("home"));
+  buildSongs();
+  return { open, refresh };
 })();
 
 // ---------------------------------------------------------------- settings
@@ -1851,11 +2042,12 @@ const prefs = (() => {
   }
   function back() {
     if (returnTo === "paused") setScreen("paused");
-    else { setScreen("menu"); menu.refresh(); }
+    else if (returnTo === "home") setScreen("home");
+    else menu.open();
   }
   $("settingsBack").addEventListener("click", back);
   $("pauseSettingsBtn").addEventListener("click", () => open("paused"));
-  return { open, back, refresh };
+  return { open, back, refresh, from: () => returnTo };
 })();
 
 // ---------------------------------------------------------------- calibration
@@ -1955,11 +2147,11 @@ const calib = (() => {
     result.textContent = `Applied. Offset is now ${fmt(settings.offsetMs)}.`;
     $("calApply").disabled = true;
   });
-  $("calBack").addEventListener("click", () => { stop(); prefs.open("menu"); });
+  $("calBack").addEventListener("click", () => { stop(); prefs.open(prefs.from() === "paused" ? "home" : prefs.from()); });
   return { show, tick, tap };
 })();
 
-setScreen("menu");
+setScreen("home");
 
 // Test hook (read-only state for automated checks)
 window.__rhythm = { game, conductor, settings, press, songTimeNow, SONGS, finishSong };
