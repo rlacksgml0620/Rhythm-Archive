@@ -197,6 +197,51 @@ button:disabled { opacity: 0.3; cursor: default; }
 .slot .v { font-size: 12px; color: var(--fg); }
 .slot.now { border-color: var(--fg); }
 .slot.off .v { color: var(--mute); text-decoration: line-through; }
+/* ---- finale (after the last note) ---- */
+.finale { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.62);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.finale-inner { width: 100%; max-width: 520px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.finale-line { height: 2px; width: 0; background: var(--fg); animation: f-line 0.5s 0.05s cubic-bezier(.2,.8,.2,1) forwards; }
+.finale-text {
+  font-family: var(--font-display); font-weight: 900; font-size: min(8.4vw, 58px); letter-spacing: 0.08em; white-space: nowrap;
+  padding: 0.18em 0.4em; clip-path: inset(0 50% 0 50%); animation: f-wipe 0.35s 0.25s cubic-bezier(.2,.8,.2,1) forwards;
+}
+.finale.fc .finale-text, .finale.ap .finale-text { background: var(--fg); color: var(--ink); }
+.finale.ap .finale-text { animation: f-wipe 0.35s 0.3s cubic-bezier(.2,.8,.2,1) forwards, f-blink 0.16s 0.75s 5 steps(1); }
+.finale-sub { font-size: 12px; letter-spacing: 0.3em; color: var(--dim); opacity: 0; animation: f-fade 0.3s 0.65s forwards; }
+@keyframes f-line { to { width: 100%; } }
+@keyframes f-wipe { to { clip-path: inset(0 0 0 0); } }
+@keyframes f-blink { 50% { background: var(--ink); color: var(--fg); outline: 2px solid var(--fg); } }
+@keyframes f-fade { to { opacity: 1; } }
+#flash { position: absolute; inset: 0; background: var(--fg); opacity: 0; pointer-events: none; z-index: 5; }
+#flash.on { animation: flash 0.5s ease-out; }
+@keyframes flash { from { opacity: 0.9; } to { opacity: 0; } }
+
+/* ---- result reveal ---- */
+.rv { opacity: 0; transform: translateY(6px); transition: opacity 0.25s, transform 0.25s; }
+.rv.in { opacity: 1; transform: none; }
+.rank { align-self: center; padding: 0 0.14em; }
+.rank.pending { opacity: 0; }
+.rank.tier-a { outline: 3px solid var(--fg); outline-offset: -3px; }
+.rank.tier-s { background: var(--fg); color: var(--ink); }
+.rank.rise { animation: r-rise 0.5s ease-out both; }
+.rank.slam { animation: r-slam 0.2s cubic-bezier(.55,0,.8,.2) both; }
+.rank.glitch { animation: r-glitch 0.42s steps(1) both; }
+@keyframes r-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes r-slam { from { opacity: 0; transform: scale(2.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes r-glitch {
+  0% { opacity: 0; } 12% { opacity: 1; transform: translateX(-8px) skewX(-14deg); } 26% { opacity: 0; }
+  40% { opacity: 1; transform: translateX(6px) scaleY(0.7); } 55% { opacity: 0.15; }
+  70% { opacity: 1; transform: translateX(-4px) skewX(10deg); } 85% { opacity: 0; } 100% { opacity: 0; }
+}
+.shake { animation: shake 0.38s; }
+@keyframes shake { 0%,100% { transform: none; } 20% { transform: translate(-7px,3px); } 40% { transform: translate(6px,-4px); } 60% { transform: translate(-4px,2px); } 80% { transform: translate(2px,-1px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .finale-line, .finale-text, .finale-sub, .rank.rise, .rank.slam, .rank.glitch, .shake, #flash.on { animation: none !important; }
+  .finale-line { width: 100%; } .finale-text { clip-path: none; } .finale-sub { opacity: 1; }
+  #pulse { transition: none; }
+}
 </style>
 
 </head>
@@ -274,6 +319,17 @@ button:disabled { opacity: 0.3; cursor: default; }
     </div>
   </section>
 
+  <!-- FINALE -->
+  <section id="finale" class="finale" aria-live="polite" hidden>
+    <div class="finale-inner">
+      <div class="finale-line"></div>
+      <div class="finale-text" id="finaleText">CLEAR</div>
+      <div class="finale-sub" id="finaleSub">// TRACK COMPLETE</div>
+      <div class="finale-line"></div>
+    </div>
+  </section>
+  <div id="flash"></div>
+
   <!-- CALIBRATION -->
   <section id="calib" class="screen solid" aria-label="Sync calibration" hidden>
     <div class="col" style="flex:1">
@@ -347,6 +403,15 @@ class Synth {
   }
   static freq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
   add(i, v) { if (i >= 0 && i < this.buf.length) this.buf[i] += v; }
+  crash(t, vol, len = 1.2) {
+    const s0 = Math.round(t * SR), n = Math.floor(len * SR);
+    let prev = 0;
+    for (let i = 0; i < n; i++) {
+      const x = this.noise();
+      this.add(s0 + i, (x - prev * 0.6) * Math.exp(-(i / SR) * (4 / len)) * vol);
+      prev = x;
+    }
+  }
   kick(t, vol) {
     const s0 = Math.round(t * SR), n = Math.floor(0.35 * SR);
     let ph = 0;
@@ -1115,9 +1180,9 @@ function draw() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = COL.bg;
   g.fillRect(0, 0, w, h);
-  if (game.state !== "playing" && game.state !== "paused") return;
+  if (game.state !== "playing" && game.state !== "paused" && game.state !== "finale") return;
 
-  const t = game.state === "paused" ? game.songTime : songTimeNow();
+  const t = game.state === "playing" ? songTimeNow() : game.songTime;
   const lw = view.laneW, top = 0, jy = view.judgeY;
   const fieldW = lw * LANES;
 
@@ -1355,6 +1420,7 @@ function setScreen(s) {
   screens.pause.hidden = s !== "paused";
   screens.result.hidden = s !== "result";
   screens.calib.hidden = s !== "calib";
+  $("finale").hidden = s !== "finale";
   $("pauseBtn").hidden = s !== "playing";
 }
 
@@ -1373,12 +1439,64 @@ function resumeGame() {
   setScreen("playing");
 }
 function quitToMenu() {
+  clearReveal();
   conductor.stop();
   game.score = null;
   setScreen("menu");
   menu.refresh();
 }
-function retry() { conductor.stop(); samplesFor(game.song).then((data) => startGame(game.song, game.chart, data)); }
+function retry() { clearReveal(); conductor.stop(); samplesFor(game.song).then((data) => startGame(game.song, game.chart, data)); }
+
+// ---------------------------------------------------------------- sound effects
+const SFX = {
+  tick: (s) => s.click(0, 0.35, 2093),
+  clear: (s) => {
+    [76, 79, 83].forEach((m, i) => s.lead(i * 0.09, 0.12, m, 0.18));
+    s.pad(0.27, 0.9, [64, 71, 76], 0.07); s.lead(0.27, 0.9, 88, 0.1, true);
+  },
+  fullcombo: (s) => {
+    [72, 76, 79, 84].forEach((m, i) => s.lead(i * 0.07, 0.1, m, 0.18));
+    s.kick(0.28, 0.9); s.crash(0.28, 0.12, 0.8);
+    s.pad(0.28, 1.1, [60, 67, 72, 76], 0.07); s.lead(0.28, 1.1, 84, 0.12, true);
+  },
+  allperfect: (s) => {
+    [72, 76, 79, 84, 88, 91].forEach((m, i) => s.lead(i * 0.055, 0.09, m, 0.16));
+    s.kick(0.33, 1); s.snare(0.33, 0.4); s.crash(0.33, 0.2, 1.6);
+    s.pad(0.33, 1.5, [60, 64, 67, 72, 76], 0.06); s.lead(0.33, 1.5, 96, 0.08, true);
+  },
+  // D-B: one soft tone
+  rankLow: (s) => { s.lead(0, 0.3, 79, 0.16, true); },
+  // A: "ba-bam"
+  rankA: (s) => {
+    s.lead(0, 0.08, 79, 0.2); s.kick(0, 0.4);
+    s.lead(0.16, 0.6, 84, 0.2); s.kick(0.16, 0.95); s.pad(0.16, 0.6, [60, 67, 72], 0.06);
+  },
+  // S, SS, SSS: "bee-ba-ba-bam"
+  rankS: (s) => {
+    s.lead(0, 0.09, 96, 0.13); s.click(0, 0.4, 2637);
+    s.lead(0.2, 0.06, 84, 0.2); s.lead(0.3, 0.06, 84, 0.2);
+    s.lead(0.42, 0.9, 91, 0.2); s.lead(0.42, 0.9, 84, 0.12);
+    s.kick(0.42, 1); s.snare(0.42, 0.45); s.crash(0.42, 0.18, 1.4);
+    s.pad(0.42, 0.9, [67, 74, 79, 83], 0.06);
+  },
+};
+function playSfx(name) {
+  if (!audio.ctx) return;
+  const buf = audio.buffer("sfx-" + name, () => { const s = new Synth(name === "tick" ? 0.1 : 2.2); SFX[name](s); return s.finish(); });
+  const src = audio.ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audio.out);
+  src.start();
+}
+function flash() {
+  const f = $("flash");
+  f.classList.remove("on"); void f.offsetWidth; f.classList.add("on");
+}
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let revealTimers = [];
+const later = (ms, fn) => revealTimers.push(setTimeout(fn, ms));
+function clearReveal() { revealTimers.forEach(clearTimeout); revealTimers = []; }
 
 function finishSong() {
   conductor.stop();
@@ -1387,13 +1505,32 @@ function finishSong() {
   const prev = store.get(key, 0);
   const newBest = s.score > prev;
   if (newBest) store.set(key, s.score);
-  const rank = rankOf(s.score);
-  $("resSong").innerHTML = "";
-  $("resSong").append(`${game.song.title} · `);
-  $("resSong").append(`${c.difficulty} Lv.${c.level}`);
-  $("resRank").textContent = rank;
-  $("resClear").textContent = s.allPerfect ? "[ ALL PERFECT ]" : s.fullCombo ? "[ FULL COMBO ]" : "[ CLEAR ]";
-  $("resScore").textContent = s.score.toLocaleString("en-US");
+  const result = { s, c, prev, newBest, rank: rankOf(s.score), kind: s.allPerfect ? "ap" : s.fullCombo ? "fc" : "clear" };
+
+  // Finale: CLEAR / FULL COMBO / ALL PERFECT over the frozen playfield.
+  const fin = $("finale");
+  fin.className = "finale " + result.kind;
+  $("finaleText").textContent = { clear: "CLEAR", fc: "FULL COMBO", ap: "ALL PERFECT" }[result.kind];
+  $("finaleSub").textContent = { clear: "// TRACK COMPLETE", fc: "// NO BREAK DETECTED", ap: "// FLAWLESS RECORD" }[result.kind];
+  // restart CSS animations
+  fin.querySelectorAll("*").forEach((el) => { el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; });
+  clearReveal();
+  setScreen("finale");
+  playSfx({ clear: "clear", fc: "fullcombo", ap: "allperfect" }[result.kind]);
+  if (result.kind === "ap") later(330, flash);
+  game.pendingResult = result;
+  later(result.kind === "ap" ? 2600 : 2200, () => showResult(result));
+}
+
+function showResult({ s, c, prev, newBest, rank, kind }) {
+  clearReveal();
+  game.pendingResult = null;
+  $("resSong").textContent = `${game.song.title} · ${c.difficulty} Lv.${c.level}`;
+  const rankEl = $("resRank");
+  rankEl.textContent = rank;
+  rankEl.className = "rank pending";
+  $("resClear").textContent = kind === "ap" ? "[ ALL PERFECT ]" : kind === "fc" ? "[ FULL COMBO ]" : "[ CLEAR ]";
+  $("resScore").textContent = "0";
   $("resBest").textContent = newBest ? "// NEW RECORD ARCHIVED" : `// BEST ${prev.toLocaleString("en-US")}`;
   const rows = [
     ["PERFECT", s.counts[J.PERFECT]], ["GREAT", s.counts[J.GREAT]],
@@ -1402,13 +1539,67 @@ function finishSong() {
   ];
   const dl = $("resStats");
   dl.replaceChildren();
+  const rowEls = [];
   for (const [k, v] of rows) {
     const dt = document.createElement("dt"); dt.textContent = k;
     const dd = document.createElement("dd"); dd.textContent = v;
+    dt.className = dd.className = "rv";
     dl.append(dt, dd);
+    rowEls.push([dt, dd]);
   }
+  [$("resSong"), $("resClear"), $("resBest")].forEach((el) => { el.classList.remove("in"); el.classList.add("rv"); });
   setScreen("result");
+
+  const col = screens.result.querySelector(".col");
+  const tier = rank.startsWith("S") ? "s" : rank === "A" ? "a" : "low";
+  let skipped = false;
+  const finish = () => {
+    skipped = true;
+    clearReveal();
+    $("resScore").textContent = s.score.toLocaleString("en-US");
+    rowEls.flat().forEach((el) => el.classList.add("in"));
+    [$("resSong"), $("resClear"), $("resBest")].forEach((el) => el.classList.add("in"));
+    rankEl.className = "rank" + (tier === "s" ? " tier-s" : tier === "a" ? " tier-a" : "");
+    screens.result.removeEventListener("pointerdown", onSkip);
+  };
+  const onSkip = (e) => { if (!e.target.closest("button")) finish(); };
+  screens.result.addEventListener("pointerdown", onSkip);
+
+  if (reduceMotion()) { finish(); return; }
+
+  later(80, () => $("resSong").classList.add("in"));
+  rowEls.forEach((pair, i) => later(250 + i * 90, () => { pair.forEach((el) => el.classList.add("in")); playSfx("tick"); }));
+  // score count-up
+  const t0 = performance.now() + 300, dur = 900;
+  const count = () => {
+    if (skipped) return;
+    const k = Math.min(1, Math.max(0, (performance.now() - t0) / dur));
+    $("resScore").textContent = Math.round(s.score * (1 - (1 - k) ** 3)).toLocaleString("en-US");
+    if (k < 1) requestAnimationFrame(count);
+  };
+  requestAnimationFrame(count);
+
+  const R = 1400; // rank reveal
+  if (tier === "low") {
+    later(R, () => { rankEl.className = "rank rise"; playSfx("rankLow"); });
+    later(R + 500, () => { $("resClear").classList.add("in"); $("resBest").classList.add("in"); });
+  } else if (tier === "a") {
+    // "ba" at +40ms, "bam" at +200ms = the moment the rank lands
+    later(R, () => { rankEl.className = "rank tier-a slam"; });
+    later(R + 40, () => playSfx("rankA"));
+    later(R + 200, () => { col.classList.remove("shake"); void col.offsetWidth; col.classList.add("shake"); });
+    later(R + 650, () => { $("resClear").classList.add("in"); $("resBest").classList.add("in"); });
+  } else {
+    // "bee" glitches the rank, "ba-ba" builds, "bam" (+420ms) is when it lands
+    later(R, () => { playSfx("rankS"); rankEl.className = "rank tier-s glitch"; });
+    later(R + 220, () => { rankEl.className = "rank tier-s slam"; });
+    later(R + 420, () => { flash(); col.classList.remove("shake"); void col.offsetWidth; col.classList.add("shake"); });
+    later(R + 950, () => { $("resClear").classList.add("in"); $("resBest").classList.add("in"); });
+  }
+  later(R + 1300, () => { if (!skipped) finish(); });
 }
+
+$("finale").addEventListener("pointerdown", () => { if (game.pendingResult) showResult(game.pendingResult); });
 
 $("pauseBtn").addEventListener("click", pauseGame);
 $("resumeBtn").addEventListener("click", resumeGame);
@@ -1582,7 +1773,7 @@ const calib = (() => {
 setScreen("menu");
 
 // Test hook (read-only state for automated checks)
-window.__rhythm = { game, conductor, settings, press, songTimeNow, SONGS };
+window.__rhythm = { game, conductor, settings, press, songTimeNow, SONGS, finishSong };
 })();
 </script>
 
