@@ -188,6 +188,15 @@ button:disabled { opacity: 0.3; cursor: default; }
 #pulse { width: 130px; height: 130px; border: 3px solid var(--fg); }
 .calib-status { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .calib-result { color: var(--dim); font-size: 13px; letter-spacing: 0.04em; line-height: 1.6; min-height: 46px; }
+.slots { width: 100%; display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.slot {
+  height: 40px; border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 11px; font-variant-numeric: tabular-nums; color: var(--mute); position: relative; overflow: hidden;
+}
+.slot .n { font-size: 9px; letter-spacing: 0.1em; }
+.slot .v { font-size: 12px; color: var(--fg); }
+.slot.now { border-color: var(--fg); }
+.slot.off .v { color: var(--mute); text-decoration: line-through; }
 </style>
 
 </head>
@@ -271,11 +280,12 @@ button:disabled { opacity: 0.3; cursor: default; }
       <div class="brand">
         <div class="sys"><span>SYS.CALIBRATE</span><span>100 BPM</span></div>
         <h1 style="font-size:28px">SYNC<br>CALIBRATION</h1>
-        <p>Tap anywhere on each click. 4 count-in clicks, then 16 taps.</p>
+        <p>Tap anywhere on each click. After 4 count-in clicks, each of the 16 clicks is measured on its own and the offsets are averaged.</p>
       </div>
       <div class="calib-body" id="calibArea">
         <div id="pulse"></div>
         <div class="calib-status" id="calibStatus">Press START</div>
+        <div class="slots" id="calibSlots" aria-label="Offset per click"></div>
         <div class="calib-result" id="calibResult"></div>
       </div>
       <div class="row3">
@@ -1470,35 +1480,57 @@ const menu = (() => {
 
 // ---------------------------------------------------------------- calibration
 const calib = (() => {
-  const BPM = 100, COUNT_IN = 4, NEED = 16, TOTAL = COUNT_IN + NEED + 4, BEAT = 60 / BPM;
-  let running = false, deltas = [], measured = 0, has = false;
-  const status = $("calibStatus"), result = $("calibResult"), pulse = $("pulse");
+  const BPM = 100, COUNT_IN = 4, NEED = 16, TOTAL = COUNT_IN + NEED + 2, BEAT = 60 / BPM;
+  const OUTLIER = 0.06; // taps this far (s) from the median are left out of the average
+  let running = false, slots = new Array(NEED).fill(null), measured = 0, has = false;
+  const status = $("calibStatus"), result = $("calibResult"), pulse = $("pulse"), grid = $("calibSlots");
   const fmt = (ms) => `${ms > 0 ? "+" : ""}${Math.round(ms)} ms`;
+  const cells = Array.from({ length: NEED }, (_, i) => {
+    const c = document.createElement("div"); c.className = "slot";
+    const n = document.createElement("span"); n.className = "n"; n.textContent = String(i + 1).padStart(2, "0");
+    const v = document.createElement("span"); v.className = "v"; v.textContent = "·";
+    c.append(n, v); grid.append(c);
+    return { c, v };
+  });
+  function paint(current = -1, outliers = new Set()) {
+    cells.forEach(({ c, v }, i) => {
+      const d = slots[i];
+      v.textContent = d == null ? "·" : `${d > 0 ? "+" : ""}${Math.round(d * 1000)}`;
+      c.classList.toggle("now", i === current);
+      c.classList.toggle("off", outliers.has(i));
+    });
+  }
   function show() {
-    running = false; has = false; deltas = [];
+    running = false; has = false; slots.fill(null);
     status.textContent = "Press START";
     result.textContent = `Current offset: ${fmt(settings.offsetMs)}`;
     $("calApply").disabled = true;
     $("calStart").textContent = "START";
+    paint();
   }
   function start() {
     audio.ensure();
-    const buf = audio.buffer("metronome", () => clickTrack(BPM, TOTAL));
-    deltas = []; has = false;
+    const buf = audio.buffer("metronome2", () => clickTrack(BPM, TOTAL));
+    slots.fill(null); has = false;
     $("calApply").disabled = true;
     $("calStart").textContent = "RETRY";
     result.textContent = "";
+    paint();
     conductor.play(buf, 0.5);
     running = true;
   }
   function stop() { if (running) conductor.stop(); running = false; }
+  // Each tap is matched to the nearest click; only the first tap per click counts.
   function tap(e) {
     if (!running) return;
     const ago = e && typeof e.timeStamp === "number" ? (performance.now() - e.timeStamp) / 1000 : 0;
     const t = conductor.audioTime() - (ago > 0 && ago < 0.2 ? ago : 0);
     const nearest = Math.round(t / BEAT);
     const d = t - nearest * BEAT;
-    if (nearest >= COUNT_IN && nearest < TOTAL && Math.abs(d) < BEAT * 0.4) deltas.push(d);
+    const slot = nearest - COUNT_IN;
+    if (slot < 0 || slot >= NEED || slots[slot] != null || Math.abs(d) >= BEAT * 0.4) return;
+    slots[slot] = d;
+    paint(slot);
   }
   function tick() {
     if (!running) { pulse.style.transform = "scale(0.8)"; return; }
@@ -1507,25 +1539,33 @@ const calib = (() => {
     const s = t < 0 ? 0.8 : 1.15 - 0.35 * Math.min(1, ph * 2.5);
     pulse.style.transform = `scale(${s})`;
     pulse.style.borderColor = idx >= 0 && idx < COUNT_IN ? COL.dim : COL.fg;
-    status.textContent = idx < COUNT_IN ? (t < 0 ? "Get ready…" : `Count-in ${idx + 1}`) : `Taps ${deltas.length} / ${NEED}`;
-    if (deltas.length >= NEED || t > TOTAL * BEAT + 0.3) finish();
+    const cur = Math.round(bp) - COUNT_IN;
+    const got = slots.filter((d) => d != null).length;
+    status.textContent = idx < COUNT_IN ? (t < 0 ? "Get ready…" : `Count-in ${idx + 1}`) : `Click ${Math.min(NEED, cur + 1)} / ${NEED} · tapped ${got}`;
+    cells.forEach(({ c }, i) => c.classList.toggle("now", i === cur));
+    if (t > (COUNT_IN + NEED) * BEAT + BEAT * 0.5) finish();
   }
   function finish() {
     stop();
-    if (deltas.length < NEED / 2) {
+    const taken = slots.map((d, i) => ({ d, i })).filter((x) => x.d != null);
+    if (taken.length < NEED / 2) {
       status.textContent = "Not enough taps";
-      result.textContent = "Try again and tap along with the clicks.";
+      result.textContent = `Only ${taken.length} of ${NEED} clicks were tapped. Try again.`;
+      paint();
       return;
     }
-    const sorted = [...deltas].sort((a, b) => a - b);
-    const m = sorted.length;
+    const sorted = taken.map((x) => x.d).sort((a, b) => a - b), m = sorted.length;
     const median = m % 2 ? sorted[(m - 1) / 2] : (sorted[m / 2 - 1] + sorted[m / 2]) / 2;
-    const mean = deltas.reduce((a, b) => a + b, 0) / m;
-    const sd = Math.sqrt(deltas.reduce((a, b) => a + (b - mean) ** 2, 0) / m) * 1000;
-    measured = Math.round(median * 1000); has = true;
+    const kept = taken.filter((x) => Math.abs(x.d - median) <= OUTLIER);
+    const outliers = new Set(taken.filter((x) => Math.abs(x.d - median) > OUTLIER).map((x) => x.i));
+    const mean = kept.reduce((a, x) => a + x.d, 0) / kept.length;
+    const sd = Math.sqrt(kept.reduce((a, x) => a + (x.d - mean) ** 2, 0) / kept.length) * 1000;
+    measured = Math.round(mean * 1000); has = true;
+    paint(-1, outliers);
     $("calApply").disabled = false;
-    status.textContent = `Measured ${fmt(measured)}`;
-    result.textContent = `Consistency ±${Math.round(sd)} ms · current ${fmt(settings.offsetMs)}. Press APPLY to use it.`;
+    status.textContent = `Average ${fmt(measured)}`;
+    result.textContent = `Averaged ${kept.length} of ${NEED} clicks` + (outliers.size ? ` (${outliers.size} stray tap${outliers.size > 1 ? "s" : ""} left out)` : "") +
+      ` · spread ±${Math.round(sd)} ms · current ${fmt(settings.offsetMs)}. Press APPLY to use it.`;
   }
   $("calibArea").addEventListener("pointerdown", (e) => { e.preventDefault(); tap(e); });
   $("calStart").addEventListener("click", start);
