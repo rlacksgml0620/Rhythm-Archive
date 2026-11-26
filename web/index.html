@@ -115,14 +115,15 @@ button:disabled { opacity: 0.3; cursor: default; }
 }
 .song .meta { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .song .t { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.song.boss .t::after { content: " ■"; }
 .song .a { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; font-variant-numeric: tabular-nums; }
 
-.diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.diffs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .diff {
   padding: 12px 6px; background: var(--panel); border: 1px solid var(--line);
   display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
-.diff .n { font-size: 11px; letter-spacing: 0.2em; }
+.diff .n { font-size: 10px; letter-spacing: 0.14em; }
 .diff .lv { font-family: var(--font-display); font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .diff[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
 .best { color: var(--dim); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; font-variant-numeric: tabular-nums; min-height: 18px; }
@@ -431,20 +432,46 @@ class Synth {
   }
 }
 
-// ============================================================ demo song "Neon Pulse"
-const Demo = (() => {
+// ============================================================ songs
+// Music and charts come from the same score data, so every note lands on a sound.
+// Charts assume two thumbs: lanes 0-1 left, 2-3 right. Chords and taps during a hold
+// always go to the other thumb's side.
+const DIFFS = ["EASY", "NORMAL", "HARD", "MASTER"];
+const side = (lane) => (lane < 2 ? 0 : 1);
+const opposite = (lane) => (lane + 2) % 4;
+const otherSide = (lane, k) => (side(lane) === 0 ? 2 : 0) + (k % 2);
+
+function chartBuilder(beatSec) {
+  const notes = [];
+  const at = (bar, beat) => (bar * 4 + beat) * beatSec;
+  return {
+    notes,
+    tap: (bar, beat, lane) => notes.push({ time: at(bar, beat), lane, duration: 0 }),
+    hold: (bar, beat, lane, beats) => notes.push({ time: at(bar, beat), lane, duration: beats * beatSec }),
+  };
+}
+
+// ---------------------------------------------------------------- Neon Pulse (140 BPM)
+const NeonPulse = (() => {
   const BPM = 140, BARS = 32, BEAT = 60 / BPM;
   const BASS = [45, 41, 48, 43];
   const PAD = [[57, 60, 64], [57, 60, 65], [55, 60, 64], [55, 59, 62]];
   const LEAD = [[69, 72, 76, 81], [65, 69, 72, 77], [67, 72, 76, 79], [67, 71, 74, 79]];
   const PAT_A = [0, 1, 2, 3, 2, 1, 2, -1], PAT_B = [3, 2, 1, 0, 1, 2, 3, -1];
+  const P16_A = [0, 2, 1, 3, 0, 2, 1, 3, 1, 3, 0, 2, 1, 3, 2, -1];
+  const P16_B = [3, 1, 2, 0, 3, 1, 2, 0, 2, 0, 3, 1, 2, 0, 1, -1];
   const INTRO_HOLD = [0, 3, 1, 2], VERSE = [0, 2, 1, 3, 3, 1, 2, 0], STAIRS = [0, 1, 2, 3, 2, 1];
   const section = (b) => b < 4 ? "intro" : b < 12 ? "verse" : b < 20 ? "chorus" : b < 24 ? "break" : b < 30 ? "chorus" : "outro";
   const T = (bar, beat) => (bar * 4 + beat) * BEAT;
-  const pat = (bar) => bar % 2 === 0 ? PAT_A : PAT_B;
+  const chorusB = (bar) => bar >= 24 && bar < 30;
   const breakTones = (bar) => bar % 2 === 0 ? [0, 2] : [3, 1];
+  // Lead tone (= lane) on a 16th step of a chorus bar, -1 for a rest.
+  function lead16(bar, st) {
+    if (chorusB(bar)) return (bar % 2 === 0 ? P16_A : P16_B)[st];
+    return st % 2 ? -1 : (bar % 2 === 0 ? PAT_A : PAT_B)[st / 2];
+  }
 
-  function render() {
+  function* render() {
     const s = new Synth(BARS * 4 * BEAT + 2.5), b = BEAT;
     for (let bar = 0; bar < BARS; bar++) {
       const ch = bar % 4, sec = section(bar), last = bar === BARS - 1;
@@ -458,8 +485,11 @@ const Demo = (() => {
         if (bar === 19 || bar === 29) { s.snare(T(bar, 3.5), 0.3); s.snare(T(bar, 3.75), 0.3); }
         for (let st = 0; st < 8; st++) s.bass(T(bar, st * 0.5), 0.45 * b, BASS[ch] + (st % 2 ? 12 : 0), 0.28);
         if (sec === "chorus") {
-          const p = pat(bar);
-          for (let st = 0; st < 8; st++) if (p[st] >= 0) s.lead(T(bar, st * 0.5), 0.45 * b, LEAD[ch][p[st]], 0.13);
+          const len = chorusB(bar) ? 0.22 * b : 0.45 * b;
+          for (let st = 0; st < 16; st++) {
+            const tone = lead16(bar, st);
+            if (tone >= 0) s.lead(T(bar, st * 0.25), len, LEAD[ch][tone], 0.13);
+          }
         }
       }
       if (sec === "break") {
@@ -481,79 +511,251 @@ const Demo = (() => {
           s.lead(T(bar, 0), 2 * b, 76, 0.14, true);
         }
       }
+      yield;
     }
     return s.finish();
   }
 
   function chart(difficulty, level) {
-    const notes = [];
-    const easy = difficulty === "EASY", hard = difficulty === "HARD";
-    const tap = (bar, beat, lane) => notes.push({ time: T(bar, beat), lane, duration: 0 });
-    const hold = (bar, beat, lane, beats) => notes.push({ time: T(bar, beat), lane, duration: beats * BEAT });
+    const D = DIFFS.indexOf(difficulty);
+    const { notes, tap, hold } = chartBuilder(BEAT);
     for (let bar = 0; bar < BARS; bar++) {
       switch (section(bar)) {
         case "intro": {
-          const hl = easy ? (bar % 2 === 0 ? 1 : 2) : INTRO_HOLD[bar];
+          const hl = D === 0 ? (bar % 2 === 0 ? 1 : 2) : INTRO_HOLD[bar];
           hold(bar, 0, hl, 2);
-          if (bar >= 2 && !easy) {
-            if (hard) for (let st = 1, k = 0; st < 8; st++, k++) tap(bar, st * 0.5, (hl + 1 + (k % 3)) % 4);
-            else { tap(bar, 2, (hl + 2) % 4); tap(bar, 3, (hl + 1) % 4); }
-          }
+          if (bar >= 2 && D === 1) { tap(bar, 2, opposite(hl)); tap(bar, 3, otherSide(hl, 1)); }
+          if (bar >= 2 && D >= 2) for (let st = 1; st < 8; st++) tap(bar, st * 0.5, otherSide(hl, st));
           break;
         }
         case "verse":
-          if (easy) { tap(bar, 0, bar % 2 === 0 ? 1 : 2); tap(bar, 2, bar % 2 === 0 ? 2 : 1); }
-          else if (!hard) for (let bt = 0; bt < 4; bt++) tap(bar, bt, VERSE[(bar * 4 + bt) % 8]);
+          if (D === 0) { tap(bar, 0, bar % 2 === 0 ? 1 : 2); tap(bar, 2, bar % 2 === 0 ? 2 : 1); }
+          else if (D === 1) for (let bt = 0; bt < 4; bt++) tap(bar, bt, VERSE[(bar * 4 + bt) % 8]);
           else for (let st = 0; st < 8; st++) {
             const lane = STAIRS[(bar * 8 + st) % STAIRS.length];
             tap(bar, st * 0.5, lane);
-            if (st === 0 && bar % 2 === 0) tap(bar, 0, 3 - lane);
+            if (D === 2 && st === 0 && bar % 2 === 0) tap(bar, 0, 3 - lane);
+            if (D === 3 && st % 2 === 0) tap(bar, st * 0.5, opposite(lane));
           }
           break;
-        case "chorus": {
-          const p = pat(bar);
-          for (let st = 0; st < 8; st++) {
-            const tone = p[st];
+        case "chorus":
+          for (let st = 0; st < 16; st++) {
+            const tone = lead16(bar, st);
             if (tone < 0) continue;
-            if (easy && st % 4 !== 0) continue;
-            if (!easy && !hard && st % 2 !== 0) continue;
-            tap(bar, st * 0.5, tone);
-            if (hard && st % 4 === 0) tap(bar, st * 0.5, (tone + 2) % 4);
+            const grid = [8, 4, 2, 1][D];
+            if (st % grid !== 0) continue;
+            tap(bar, st * 0.25, tone);
+            if (D === 2 && st % 8 === 0) tap(bar, st * 0.25, opposite(tone));
+            if (D === 3 && st % 4 === 0) tap(bar, st * 0.25, opposite(tone));
           }
           break;
-        }
         case "break": {
           const tones = breakTones(bar);
           for (let k = 0; k < 2; k++) {
             hold(bar, k * 2, tones[k], 1.5);
-            if (hard) tap(bar, k * 2 + 1, (tones[k] + 2) % 4);
+            if (D === 2) tap(bar, k * 2 + 1, opposite(tones[k]));
+            if (D === 3) [0.5, 1, 1.5].forEach((o, i) => tap(bar, k * 2 + o, otherSide(tones[k], i)));
           }
           break;
         }
         case "outro":
-          if (bar < BARS - 1) { if (easy) hold(bar, 0, 1, 3); else { hold(bar, 0, 0, 3); hold(bar, 0, 3, 3); } }
-          else { tap(bar, 0, 1); if (!easy) tap(bar, 0, 2); }
+          if (bar < BARS - 1) { if (D === 0) hold(bar, 0, 1, 3); else { hold(bar, 0, 0, 3); hold(bar, 0, 3, 3); } }
+          else { tap(bar, 0, 1); if (D > 0) tap(bar, 0, 2); }
           break;
       }
     }
     return normalize({ difficulty, level, notes });
   }
 
-  function clickTrack(bpm, beats) {
-    const beat = 60 / bpm, s = new Synth(beats * beat + 0.5);
-    for (let i = 0; i < beats; i++) s.click(i * beat, i % 4 === 0 ? 0.9 : 0.6, i % 4 === 0 ? 1760 : 1320);
+  return {
+    id: "demo_neon_pulse", title: "Neon Pulse", artist: "Rhythm Archive", bpm: BPM, boss: false,
+    charts: [chart("EASY", 2), chart("NORMAL", 5), chart("HARD", 9), chart("MASTER", 13)],
+    render,
+  };
+})();
+
+// ---------------------------------------------------------------- ZERO//ARCHIVE (180 BPM, boss)
+const ZeroArchive = (() => {
+  const BPM = 180, BARS = 64, BEAT = 60 / BPM;
+  // E minor: Em - C - Am - B
+  const BASS = [40, 36, 33, 35];
+  const PAD = [[64, 67, 71], [60, 64, 67], [57, 60, 64], [59, 63, 66]];
+  const LEAD = [[64, 67, 71, 76], [64, 67, 72, 76], [64, 69, 72, 76], [63, 66, 71, 75]];
+  const RIFF = {
+    A: [0, 2, 1, 3, 0, 2, 1, 3, 1, 3, 0, 2, 1, 3, 0, 2],
+    B: [0, 3, 1, 2, 0, 3, 1, 2, 3, 0, 2, 1, 3, 0, 2, 1],
+    C: [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 3],
+    D: [0, 3, 0, 3, 1, 2, 1, 2, 0, 3, 0, 3, 2, 1, 2, 1],
+  };
+  const VERSE = [0, 2, 1, 3, 3, 1, 2, 0];
+  const section = (b) => b < 4 ? "intro" : b < 12 ? "build" : b < 28 ? "dropA" : b < 36 ? "break"
+    : b < 44 ? "build2" : b < 60 ? "dropB" : "outro";
+  const T = (bar, beat) => (bar * 4 + beat) * BEAT;
+  const riffOf = (bar) => {
+    const sec = section(bar);
+    if (sec === "dropA") return bar % 2 === 0 ? RIFF.A : RIFF.B;
+    if (sec === "dropB") return [RIFF.C, RIFF.D, RIFF.A, RIFF.B][bar % 4];
+    return RIFF.C;
+  };
+  const breakTones = (bar) => bar % 2 === 0 ? [0, 2] : [3, 1];
+
+  function* render() {
+    const s = new Synth(BARS * 4 * BEAT + 2.5), b = BEAT;
+    for (let bar = 0; bar < BARS; bar++) {
+      const ch = bar % 4, sec = section(bar), last = bar === BARS - 1;
+      const riff = riffOf(bar);
+      const isBuild = sec === "build" || sec === "build2";
+      const rel = sec === "build" ? bar - 4 : bar - 36;
+
+      if (sec === "intro" || sec === "break" || isBuild) s.pad(T(bar, 0), 4 * b, PAD[ch], 0.055);
+      if (sec === "dropA") s.pad(T(bar, 0), 4 * b, PAD[ch], 0.03);
+
+      if (sec === "intro" || isBuild) {
+        for (let st = 0; st < 16; st++) s.lead(T(bar, st * 0.25), 0.2 * b, LEAD[ch][RIFF.C[st]], sec === "intro" ? 0.07 : 0.05, true);
+        if (sec === "intro" && bar >= 2) for (let st = 0; st < 8; st++) s.hat(T(bar, st * 0.5), 0.05);
+      }
+      if (isBuild) {
+        for (let bt = 0; bt < 4; bt++) s.kick(T(bar, bt), 0.85);
+        if (rel >= 6) for (let bt = 0; bt < 4; bt++) s.kick(T(bar, bt + 0.5), 0.6);
+        for (let st = 0; st < 16; st++) s.hat(T(bar, st * 0.25), st % 2 ? 0.035 : 0.06);
+        for (let st = 0; st < 8; st++) s.bass(T(bar, st * 0.5), 0.45 * b, BASS[ch] + (st % 2 ? 12 : 0), 0.24);
+        if (rel === 4 || rel === 5) { s.snare(T(bar, 1), 0.4); s.snare(T(bar, 3), 0.4); }
+        if (rel === 6) for (let st = 0; st < 8; st++) s.snare(T(bar, st * 0.5), 0.2 + st * 0.03);
+        if (rel === 7) for (let st = 0; st < 16; st++) s.snare(T(bar, st * 0.25), 0.15 + st * 0.02);
+      }
+      if (sec === "dropA" || sec === "dropB") {
+        const kicks = sec === "dropA" ? [0, 10] : [0, 4, 8, 12, 14];
+        kicks.forEach((st) => s.kick(T(bar, st * 0.25), 0.95));
+        s.snare(T(bar, 1), 0.45); s.snare(T(bar, 3), 0.45);
+        if (sec === "dropA") s.snare(T(bar, 3.5), 0.15);
+        for (let st = 0; st < 16; st++) s.hat(T(bar, st * 0.25), sec === "dropB" ? (st % 2 ? 0.04 : 0.07) : (st % 2 ? 0 : 0.08));
+        for (let st = 0; st < 8; st++) s.bass(T(bar, st * 0.5), 0.45 * b, BASS[ch] + (st % 2 ? 12 : 0), 0.26);
+        for (let st = 0; st < 16; st++) s.lead(T(bar, st * 0.25), 0.2 * b, LEAD[ch][riff[st]], 0.095);
+        if (sec === "dropB") for (let bt = 0; bt < 4; bt++) s.pad(T(bar, bt), 0.15 * b, PAD[ch], 0.035);
+      }
+      if (sec === "break") {
+        s.bass(T(bar, 0), 3.8 * b, BASS[ch], 0.2);
+        for (let bt = 0; bt < 4; bt++) s.hat(T(bar, bt + 0.5), 0.05, 40);
+        const tones = breakTones(bar);
+        for (let k = 0; k < 2; k++) s.lead(T(bar, k * 2), 1.8 * b, LEAD[ch][tones[k]], 0.14, true);
+      }
+      if (sec === "outro") {
+        if (!last) {
+          s.pad(T(bar, 0), 4 * b, PAD[ch], 0.05);
+          s.kick(T(bar, 0), 0.9); s.kick(T(bar, 2), 0.9);
+          s.bass(T(bar, 0), 3.8 * b, BASS[ch], 0.22);
+          s.lead(T(bar, 0), 3 * b, LEAD[ch][0], 0.12, true);
+          s.lead(T(bar, 0), 3 * b, LEAD[ch][3], 0.12, true);
+        } else {
+          s.kick(T(bar, 0), 1.0); s.snare(T(bar, 0), 0.45);
+          s.bass(T(bar, 0), 3 * b, 40, 0.26);
+          s.pad(T(bar, 0), 3 * b, PAD[0], 0.06);
+          s.lead(T(bar, 0), 3 * b, 67, 0.14, true);
+          s.lead(T(bar, 0), 3 * b, 71, 0.14, true);
+        }
+      }
+      yield;
+    }
     return s.finish();
   }
 
+  function chart(difficulty, level) {
+    const D = DIFFS.indexOf(difficulty);
+    const { notes, tap, hold } = chartBuilder(BEAT);
+    for (let bar = 0; bar < BARS; bar++) {
+      const sec = section(bar), riff = riffOf(bar);
+      const streamTap = (st) => tap(bar, st * 0.25, riff[st]);
+      switch (sec) {
+        case "intro":
+          if (D === 0) hold(bar, 0, [1, 2, 1, 2][bar], 2);
+          else {
+            const grid = [0, 4, 2, 2][D];
+            for (let st = 0; st < 16; st += grid) streamTap(st);
+            if (D === 3 && bar >= 2) [13, 15].forEach(streamTap);
+          }
+          break;
+        case "build":
+        case "build2": {
+          const rel = sec === "build" ? bar - 4 : bar - 36;
+          const hard2 = sec === "build2";
+          if (D === 0) { tap(bar, 0, bar % 2 ? 2 : 1); tap(bar, 2, bar % 2 ? 1 : 2); if (rel === 7) { tap(bar, 1, 0); tap(bar, 3, 3); } }
+          else if (D === 1) {
+            for (let bt = 0; bt < 4; bt++) tap(bar, bt, VERSE[(bar * 4 + bt) % 8]);
+            if (rel >= 6) for (let bt = 0; bt < 4; bt++) tap(bar, bt + 0.5, opposite(VERSE[(bar * 4 + bt) % 8]));
+          } else if (D === 2) {
+            if (rel < 4) for (let bt = 0; bt < 4; bt++) tap(bar, bt, VERSE[(bar * 4 + bt) % 8]);
+            else if (rel < 7) for (let st = 0; st < 16; st += 2) { tap(bar, st * 0.25, RIFF.A[st]); if (st % 8 === 4) tap(bar, st * 0.25, opposite(RIFF.A[st])); }
+            else for (let st = 0; st < 16; st++) tap(bar, st * 0.25, RIFF.A[st]);
+          } else {
+            if (rel < 4) for (let st = 0; st < 16; st += 2) {
+              tap(bar, st * 0.25, RIFF.A[st]);
+              if (st % (hard2 ? 4 : 8) === 0) tap(bar, st * 0.25, opposite(RIFF.A[st]));
+            }
+            else if (rel < 6) for (let st = 0; st < 16; st++) {
+              if (!hard2 && st % 2) continue;
+              tap(bar, st * 0.25, RIFF.B[st]);
+              if (st % 8 === 4) tap(bar, st * 0.25, opposite(RIFF.B[st]));
+            }
+            else for (let st = 0; st < 16; st++) {
+              const r = rel === 6 ? RIFF.A : RIFF.D;
+              tap(bar, st * 0.25, r[st]);
+              if (st % 4 === 0) tap(bar, st * 0.25, opposite(r[st]));
+            }
+          }
+          break;
+        }
+        case "dropA":
+          for (let st = 0; st < 16; st++) {
+            const keep = [st % 4 === 0, st % 2 === 0, st % 2 === 0 || st >= 12, true][D];
+            if (!keep) continue;
+            streamTap(st);
+            if (D === 1 && st === 0) tap(bar, 0, opposite(riff[0]));
+            if (D === 2 && st % 8 === 0) tap(bar, st * 0.25, opposite(riff[st]));
+            if (D === 3 && (st === 4 || st === 12)) tap(bar, st * 0.25, opposite(riff[st]));
+          }
+          break;
+        case "break": {
+          const tones = breakTones(bar);
+          for (let k = 0; k < 2; k++) {
+            hold(bar, k * 2, tones[k], 1.5);
+            if (D === 1) tap(bar, k * 2 + 1, opposite(tones[k]));
+            if (D === 2) [0.5, 1, 1.5].forEach((o, i) => tap(bar, k * 2 + o, otherSide(tones[k], i)));
+            if (D === 3) [0.5, 1, 1.25, 1.5, 1.75].forEach((o, i) => tap(bar, k * 2 + o, otherSide(tones[k], i)));
+          }
+          break;
+        }
+        case "dropB":
+          for (let st = 0; st < 16; st++) {
+            const keep = [st % 4 === 0, st % 2 === 0, st < 8 || st % 2 === 0, true][D];
+            if (!keep) continue;
+            streamTap(st);
+            if (D === 0 && st === 0 && bar % 2 === 0) tap(bar, 0, opposite(riff[0]));
+            if (D === 1 && st % 8 === 0) tap(bar, st * 0.25, opposite(riff[st]));
+            if (D === 2 && st % 8 === 0) tap(bar, st * 0.25, opposite(riff[st]));
+            if (D === 3 && st % 4 === 0) tap(bar, st * 0.25, opposite(riff[st]));
+          }
+          break;
+        case "outro":
+          if (bar < BARS - 1) { if (D === 0) hold(bar, 0, 1, 3); else { hold(bar, 0, 0, 3); hold(bar, 0, 3, 3); } }
+          else { tap(bar, 0, 1); if (D > 0) tap(bar, 0, 2); }
+          break;
+      }
+    }
+    return normalize({ difficulty, level, notes });
+  }
+
   return {
-    song: {
-      id: "demo_neon_pulse", title: "Neon Pulse", artist: "Rhythm Archive", bpm: BPM,
-      charts: [chart("EASY", 3), chart("NORMAL", 6), chart("HARD", 9)],
-      render,
-    },
-    clickTrack,
+    id: "boss_zero_archive", title: "ZERO//ARCHIVE", artist: "Rhythm Archive", bpm: BPM, boss: true,
+    charts: [chart("EASY", 6), chart("NORMAL", 11), chart("HARD", 16), chart("MASTER", 20)],
+    render,
   };
 })();
+
+function clickTrack(bpm, beats) {
+  const beat = 60 / bpm, s = new Synth(beats * beat + 0.5);
+  for (let i = 0; i < beats; i++) s.click(i * beat, i % 4 === 0 ? 0.9 : 0.6, i % 4 === 0 ? 1760 : 1320);
+  return s.finish();
+}
 
 function normalize(chart) {
   chart.notes.sort((a, b) => a.time - b.time || a.lane - b.lane);
@@ -574,7 +776,7 @@ const endTime = (n) => n.time + (isHold(n) ? n.duration : 0);
 const judgementCount = (c) => c.notes.reduce((s, n) => s + (isHold(n) ? 2 : 1), 0);
 const lastTime = (c) => c.notes.reduce((m, n) => Math.max(m, endTime(n)), 0);
 
-const SONGS = [Demo.song];
+const SONGS = [NeonPulse, ZeroArchive];
 
 // ============================================================ audio
 const audio = {
@@ -601,10 +803,27 @@ const audio = {
   },
 };
 
-// Pre-render the demo song once the menu is on screen so PLAY starts instantly.
-let demoSamples = null;
-function demoData() { if (!demoSamples) demoSamples = Demo.song.render(); return demoSamples; }
-setTimeout(() => { try { demoData(); } catch (e) { console.error(e); } }, 400);
+// Songs are synthesized in small slices between frames so the menu stays responsive.
+const sampleJobs = new Map();
+function samplesFor(song) {
+  if (!sampleJobs.has(song.id)) {
+    sampleJobs.set(song.id, new Promise((resolve) => {
+      const it = song.render();
+      const step = () => {
+        const t0 = performance.now();
+        while (performance.now() - t0 < 10) {
+          const r = it.next();
+          if (r.done) { resolve(r.value); return; }
+        }
+        setTimeout(step, 0);
+      };
+      setTimeout(step, 0);
+    }));
+  }
+  return sampleJobs.get(song.id);
+}
+// Pre-render every song in the background, one after another.
+setTimeout(() => SONGS.reduce((p, song) => p.then(() => samplesFor(song)), Promise.resolve()), 300);
 
 // ============================================================ conductor (audio clock)
 class Conductor {
@@ -747,7 +966,7 @@ const pointers = new Map(); // pointerId -> lane
 const keyHeld = new Array(LANES).fill(false);
 const laneHeld = (lane) => keyHeld[lane] || [...pointers.values()].includes(lane);
 
-function startGame(song, chart) {
+function startGame(song, chart, samples) {
   const ctx = audio.ensure();
   game.song = song; game.chart = chart;
   game.notes = chart.notes.map((n) => ({ ...n, state: "pending" }));
@@ -761,7 +980,7 @@ function startGame(song, chart) {
   game.graceUntil = -Infinity;
   game.effects = []; game.beams.fill(0); game.judge = null;
   pointers.clear(); keyHeld.fill(false);
-  const buf = audio.buffer(song.id, song.id === Demo.song.id ? demoData : song.render);
+  const buf = audio.buffer(song.id, () => samples);
   game.endAt = Math.max(game.lastNote, buf.duration);
   conductor.play(buf, START_LEAD_IN);
   setScreen("playing");
@@ -1082,7 +1301,7 @@ function quitToMenu() {
   setScreen("menu");
   menu.refresh();
 }
-function retry() { conductor.stop(); startGame(game.song, game.chart); }
+function retry() { conductor.stop(); samplesFor(game.song).then((data) => startGame(game.song, game.chart, data)); }
 
 function finishSong() {
   conductor.stop();
@@ -1129,13 +1348,14 @@ const menu = (() => {
     list.replaceChildren();
     for (const s of SONGS) {
       const b = document.createElement("button");
-      b.type = "button"; b.className = "song";
+      b.type = "button"; b.className = s.boss ? "song boss" : "song";
       b.setAttribute("aria-pressed", String(s === song));
       const disc = document.createElement("span"); disc.className = "disc";
       disc.textContent = String(SONGS.indexOf(s) + 1).padStart(2, "0");
       const meta = document.createElement("span"); meta.className = "meta";
       const tt = document.createElement("span"); tt.className = "t"; tt.textContent = s.title;
-      const a = document.createElement("span"); a.className = "a"; a.textContent = `${s.artist} · ${s.bpm} BPM`;
+      const a = document.createElement("span"); a.className = "a";
+      a.textContent = `${s.boss ? "[BOSS] " : ""}${s.bpm} BPM · MAX Lv.${Math.max(...s.charts.map((c) => c.level))}`;
       meta.append(tt, a); b.append(disc, meta);
       b.addEventListener("click", () => { if (song !== s) { song = s; chartIdx = Math.min(1, s.charts.length - 1); } refresh(); });
       list.append(b);
@@ -1167,7 +1387,15 @@ const menu = (() => {
   $("speedUp").addEventListener("click", () => { settings.speed += 0.5; refresh(); });
   $("offDown").addEventListener("click", () => { settings.offsetMs -= 5; refresh(); });
   $("offUp").addEventListener("click", () => { settings.offsetMs += 5; refresh(); });
-  $("playBtn").addEventListener("click", () => startGame(song, song.charts[chartIdx]));
+  $("playBtn").addEventListener("click", () => {
+    audio.ensure(); // unlock audio inside the tap
+    const btn = $("playBtn"), s = song, c = song.charts[chartIdx];
+    btn.disabled = true; btn.textContent = "LOADING";
+    samplesFor(s).then((data) => {
+      btn.disabled = false; btn.textContent = "PLAY";
+      if (game.state === "menu") startGame(s, c, data);
+    });
+  });
   $("calibBtn").addEventListener("click", () => { setScreen("calib"); calib.show(); });
   refresh();
   return { refresh };
@@ -1188,7 +1416,7 @@ const calib = (() => {
   }
   function start() {
     audio.ensure();
-    const buf = audio.buffer("metronome", () => Demo.clickTrack(BPM, TOTAL));
+    const buf = audio.buffer("metronome", () => clickTrack(BPM, TOTAL));
     deltas = []; has = false;
     $("calApply").disabled = true;
     $("calStart").textContent = "RETRY";
@@ -1247,7 +1475,7 @@ const calib = (() => {
 setScreen("menu");
 
 // Test hook (read-only state for automated checks)
-window.__rhythm = { game, conductor, settings, press, release, songTimeNow, Demo };
+window.__rhythm = { game, conductor, settings, press, release, songTimeNow, SONGS };
 })();
 </script>
 
