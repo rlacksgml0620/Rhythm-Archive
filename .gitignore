@@ -31,3 +31,6 @@ crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Imported (licensed) audio is not committed
+web/audio/*.mp3
