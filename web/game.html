@@ -3,35 +3,31 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0b0d1a">
+<meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap">
 <style>
-/* Layout: one full-screen stage. Canvas draws the playfield; DOM overlays hold menus. */
+/* Layout: one full-screen stage. Monochrome archive terminal: black ground, white type, hairline frames, inverted selection. */
 :root {
-  --bg: #0b0d1a;
-  --bg-2: #12152a;
-  --panel: #161a33;
-  --line: rgba(220, 228, 255, 0.12);
-  --fg: #eef1ff;
-  --dim: #98a1c4;
-  --cyan: #59d9ff;
-  --pink: #ff73bf;
-  --gold: #ffd659;
-  --green: #73f29a;
-  --red: #ff5e6c;
-  --violet: #b28cff;
-  --ink: #0b0d1a;
-  --font-display: "Unbounded", "Arial Black", system-ui, sans-serif;
-  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --field: #070707;
+  --line: #262626;
+  --line-strong: #5a5a5a;
+  --fg: #f2f2f2;
+  --dim: #8c8c8c;
+  --mute: #4a4a4a;
+  --ink: #000000;
+  --font-display: "Orbitron", "Eurostile", "Arial Black", sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
 }
 html, body { height: 100%; }
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-user-select: none;
@@ -39,19 +35,21 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-#app { position: relative; height: 100%; overflow: hidden; }
+#app { position: relative; height: 100%; overflow: hidden; background: var(--bg); }
 #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
 button {
   font: inherit;
   color: inherit;
+  background: none;
   border: 0;
+  border-radius: 0;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-button:disabled { opacity: 0.35; cursor: default; }
+button:focus-visible { outline: 1px solid var(--fg); outline-offset: 3px; }
+button:disabled { opacity: 0.3; cursor: default; }
 
 .screen {
   position: absolute;
@@ -64,119 +62,117 @@ button:disabled { opacity: 0.35; cursor: default; }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
-.screen.solid { background: radial-gradient(120% 70% at 50% 0%, #1b2050 0%, var(--bg) 60%); }
-.screen.dim { background: rgba(6, 7, 16, 0.92); justify-content: center; align-items: center; }
+.screen.solid { background: var(--bg); }
+.screen.dim { background: rgba(0, 0, 0, 0.92); justify-content: center; align-items: center; }
 .col { width: 100%; max-width: 460px; margin-inline: auto; display: flex; flex-direction: column; gap: 18px; }
 
-.brand { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; }
+.brand { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+.sys { font-size: 11px; color: var(--dim); letter-spacing: 0.2em; text-transform: uppercase; display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
 .brand h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(30px, 9vw, 42px);
-  line-height: 1;
-  letter-spacing: -0.01em;
-  background: linear-gradient(90deg, var(--cyan), var(--pink));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-weight: 900;
+  font-size: clamp(30px, 9.5vw, 44px);
+  line-height: 1.02;
+  letter-spacing: 0.06em;
+  color: var(--fg);
   text-wrap: balance;
 }
-.brand p { margin: 0; color: var(--dim); font-size: 14px; }
+.brand p { margin: 0; color: var(--dim); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.5; }
 
-.label { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.label { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+.label::before { content: "// "; color: var(--mute); }
 .group { display: flex; flex-direction: column; gap: 10px; }
 
-.songs { display: flex; flex-direction: column; gap: 10px; }
+.songs { display: flex; flex-direction: column; gap: 8px; }
 .song {
   display: flex; align-items: center; gap: 14px;
-  padding: 14px 16px;
-  border-radius: 14px;
+  padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--line);
   text-align: left;
 }
-.song[aria-pressed="true"] { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset; }
+.song[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
 .song .disc {
-  flex: none; width: 46px; height: 46px; border-radius: 50%;
-  background: conic-gradient(from 200deg, var(--cyan), var(--pink), var(--gold), var(--cyan));
+  flex: none; width: 46px; height: 46px;
+  border: 1px solid currentColor;
   display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
 }
-.song .disc::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); }
-.song .meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.song .t { font-weight: 800; font-size: 17px; }
-.song .a { color: var(--dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.song .meta { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.song .t { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.song .a { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; font-variant-numeric: tabular-nums; }
 
-.diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .diff {
-  padding: 12px 6px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line);
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px 6px; background: var(--panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
-.diff .n { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; }
-.diff .lv { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.diff[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 22%, var(--panel)); border-color: var(--c); }
-.diff .n, .diff .lv { color: var(--c); }
-.best { color: var(--dim); font-size: 13px; text-align: center; font-variant-numeric: tabular-nums; min-height: 18px; }
+.diff .n { font-size: 11px; letter-spacing: 0.2em; }
+.diff .lv { font-family: var(--font-display); font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.diff[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+.best { color: var(--dim); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; font-variant-numeric: tabular-nums; min-height: 18px; }
 
-.settings { display: grid; gap: 10px; }
+.settings { display: grid; gap: 8px; }
 .stepper {
-  display: grid; grid-template-columns: 1fr 48px 92px 48px; align-items: center; gap: 8px;
-  padding: 8px 8px 8px 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
+  display: grid; grid-template-columns: 1fr 46px 92px 46px; align-items: center; gap: 6px;
+  padding: 7px 7px 7px 14px; background: var(--panel); border: 1px solid var(--line);
 }
-.stepper .name { font-weight: 800; font-size: 15px; }
-.stepper .name small { display: block; color: var(--dim); font-weight: 500; font-size: 12px; }
-.stepper button { height: 44px; border-radius: 10px; background: rgba(255,255,255,0.07); font-size: 22px; font-weight: 800; }
-.stepper output { text-align: center; font-weight: 800; font-size: 17px; color: var(--cyan); font-variant-numeric: tabular-nums; }
+.stepper .name { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+.stepper .name small { display: block; color: var(--dim); font-size: 11px; letter-spacing: 0.06em; margin-top: 2px; }
+.stepper button { height: 44px; border: 1px solid var(--line-strong); font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+.stepper button:active { background: var(--fg); color: var(--ink); }
+.stepper output { text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 
 .btn {
-  height: 52px; border-radius: 14px; background: rgba(255,255,255,0.08);
-  font-weight: 800; font-size: 15px; letter-spacing: 0.06em;
+  height: 52px; border: 1px solid var(--line-strong);
+  font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
 }
+.btn:active { background: var(--fg); color: var(--ink); }
 .btn.primary {
   height: 64px;
-  background: linear-gradient(90deg, var(--cyan), var(--pink));
+  background: var(--fg);
   color: var(--ink);
-  font-family: var(--font-display);
+  border-color: var(--fg);
+  font-weight: 900;
   font-size: 22px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.3em;
 }
-.hint { color: var(--dim); font-size: 12px; text-align: center; line-height: 1.5; }
+.btn.primary:active { background: var(--dim); border-color: var(--dim); }
+.hint { color: var(--mute); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; line-height: 1.7; }
 
 #pauseBtn {
   position: absolute;
   top: 14px;
   right: max(14px, env(safe-area-inset-right, 0px));
-  width: 52px; height: 52px; border-radius: 14px;
-  background: rgba(255,255,255,0.08);
-  font-family: var(--font-display); font-weight: 800; font-size: 16px;
+  width: 48px; height: 48px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  font-family: var(--font-display); font-weight: 900; font-size: 14px;
 }
 
-.center-col { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
-.big-title { font-family: var(--font-display); font-weight: 800; font-size: 34px; margin: 0 0 12px; }
+.center-col { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+.big-title { font-family: var(--font-display); font-weight: 900; font-size: 32px; letter-spacing: 0.14em; margin: 0 0 14px; }
 
-.result-head { text-align: center; display: flex; flex-direction: column; gap: 4px; padding-top: 10px; }
-.result-head .song-line { color: var(--dim); font-weight: 700; font-size: 14px; }
+.result-head { text-align: center; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; }
+.result-head .song-line { color: var(--dim); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }
 .rank {
-  font-family: var(--font-display); font-weight: 800; font-size: clamp(88px, 30vw, 130px); line-height: 1;
-  margin: 6px 0 0;
+  font-family: var(--font-display); font-weight: 900; font-size: clamp(88px, 30vw, 128px); line-height: 1;
+  letter-spacing: 0.04em; margin: 8px 0 4px;
 }
-.clear { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; }
-.score { font-family: var(--font-display); font-weight: 700; font-size: 38px; font-variant-numeric: tabular-nums; }
-.newbest { color: var(--gold); font-weight: 800; font-size: 13px; letter-spacing: 0.14em; min-height: 18px; }
-.stats { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; padding: 16px 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
-.stats dt { color: var(--dim); font-weight: 800; font-size: 13px; letter-spacing: 0.08em; }
-.stats dd { margin: 0; text-align: right; font-weight: 800; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.clear { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.3em; }
+.score { font-family: var(--font-display); font-weight: 700; font-size: 34px; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+.newbest { color: var(--dim); font-size: 12px; letter-spacing: 0.24em; min-height: 18px; }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; padding: 16px 18px; border: 1px solid var(--line); background: var(--panel); font-variant-numeric: tabular-nums; margin: 0; }
+.stats dt { color: var(--dim); font-size: 12px; letter-spacing: 0.2em; }
+.stats dd { margin: 0; text-align: right; font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 
-.calib-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; min-height: 260px; }
-#pulse { width: 150px; height: 150px; border-radius: 50%; border: 6px solid var(--cyan); box-shadow: 0 0 40px rgba(89,217,255,0.35); }
-.calib-status { font-family: var(--font-display); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
-.calib-result { color: var(--dim); font-size: 14px; line-height: 1.6; min-height: 46px; }
-
-@media (prefers-reduced-motion: reduce) {
-  #pulse { transition: none; }
-}
+.calib-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; min-height: 260px; }
+#pulse { width: 130px; height: 130px; border: 3px solid var(--fg); }
+.calib-status { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.calib-result { color: var(--dim); font-size: 13px; letter-spacing: 0.04em; line-height: 1.6; min-height: 46px; }
 </style>
 
 <div id="app">
@@ -187,8 +183,9 @@ button:disabled { opacity: 0.35; cursor: default; }
   <section id="menu" class="screen solid" aria-label="Song select">
     <div class="col">
       <div class="brand">
+        <div class="sys"><span>SYS.ARCHIVE</span><span>v0.2 // ONLINE</span></div>
         <h1>RHYTHM<br>ARCHIVE</h1>
-        <p>4-lane rhythm game · tap the notes on the line</p>
+        <p>4-lane rhythm terminal. Hit the notes on the line.</p>
       </div>
 
       <div class="group">
@@ -204,22 +201,22 @@ button:disabled { opacity: 0.35; cursor: default; }
 
       <div class="settings">
         <div class="stepper">
-          <span class="name">Note speed<small>How fast notes fall</small></span>
+          <span class="name">Speed<small>Note fall rate</small></span>
           <button type="button" id="speedDown" aria-label="Slower">−</button>
           <output id="speedVal">5.0</output>
           <button type="button" id="speedUp" aria-label="Faster">+</button>
         </div>
         <div class="stepper">
-          <span class="name">Sync offset<small>+ if notes feel early</small></span>
+          <span class="name">Offset<small>+ if notes feel early</small></span>
           <button type="button" id="offDown" aria-label="Decrease offset">−</button>
           <output id="offVal">0 ms</output>
           <button type="button" id="offUp" aria-label="Increase offset">+</button>
         </div>
-        <button type="button" class="btn" id="calibBtn">AUTO SYNC CALIBRATION</button>
+        <button type="button" class="btn" id="calibBtn">Auto sync calibration</button>
       </div>
 
       <button type="button" class="btn primary" id="playBtn">PLAY</button>
-      <p class="hint">If you hear no sound on iPhone, check the silent switch and volume.<br>Keyboard: D F J K</p>
+      <p class="hint">No sound on iPhone? Check volume and silent switch.<br>Keyboard: D / F / J / K</p>
     </div>
   </section>
 
@@ -246,7 +243,7 @@ button:disabled { opacity: 0.35; cursor: default; }
       <dl class="stats" id="resStats"></dl>
       <div class="row2">
         <button type="button" class="btn" id="resRetry">RETRY</button>
-        <button type="button" class="btn primary" id="resMenu" style="height:52px;font-size:16px">MENU</button>
+        <button type="button" class="btn primary" id="resMenu" style="height:52px;font-size:14px;letter-spacing:0.2em">MENU</button>
       </div>
     </div>
   </section>
@@ -255,8 +252,9 @@ button:disabled { opacity: 0.35; cursor: default; }
   <section id="calib" class="screen solid" aria-label="Sync calibration" hidden>
     <div class="col" style="flex:1">
       <div class="brand">
+        <div class="sys"><span>SYS.CALIBRATE</span><span>100 BPM</span></div>
         <h1 style="font-size:28px">SYNC<br>CALIBRATION</h1>
-        <p>Tap anywhere exactly on each click. The first 4 clicks are a count-in, then tap 16 times.</p>
+        <p>Tap anywhere on each click. 4 count-in clicks, then 16 taps.</p>
       </div>
       <div class="calib-body" id="calibArea">
         <div id="pulse"></div>
@@ -264,7 +262,7 @@ button:disabled { opacity: 0.35; cursor: default; }
         <div class="calib-result" id="calibResult"></div>
       </div>
       <div class="row3">
-        <button type="button" class="btn primary" id="calStart" style="height:52px;font-size:15px">START</button>
+        <button type="button" class="btn primary" id="calStart" style="height:52px;font-size:13px;letter-spacing:0.16em">START</button>
         <button type="button" class="btn" id="calApply" disabled>APPLY</button>
         <button type="button" class="btn" id="calBack">BACK</button>
       </div>
@@ -285,12 +283,11 @@ const J_WEIGHT = [1, 0.7, 0.3, 0];
 const css = getComputedStyle(document.documentElement);
 const C = (n) => css.getPropertyValue(n).trim();
 const COL = {
-  bg: C("--bg"), bg2: C("--bg-2"), fg: C("--fg"), dim: C("--dim"),
-  cyan: C("--cyan"), pink: C("--pink"), gold: C("--gold"), green: C("--green"), red: C("--red"), violet: C("--violet"),
+  bg: C("--bg"), field: C("--field"), line: C("--line"), fg: C("--fg"), dim: C("--dim"), mute: C("--mute"),
 };
-const LANE_COLORS = [COL.cyan, COL.pink, COL.pink, COL.cyan];
-const J_COLORS = [COL.gold, COL.cyan, COL.green, COL.red];
-const DIFF_COLORS = { EASY: COL.green, NORMAL: COL.gold, HARD: COL.red };
+// Monochrome: outer lanes white, inner lanes light grey, so chords still read at a glance.
+const LANE_COLORS = [COL.fg, "#b8b8b8", "#b8b8b8", COL.fg];
+const J_COLORS = [COL.fg, "#b8b8b8", "#7c7c7c", "#4a4a4a"];
 const START_LEAD_IN = 3.0;
 const RESUME_REWIND = 2.0;
 
@@ -835,12 +832,9 @@ function draw() {
   const fieldW = lw * LANES;
 
   // lanes
-  const lg = g.createLinearGradient(0, 0, 0, h);
-  lg.addColorStop(0, withAlpha(COL.bg2, 0.4));
-  lg.addColorStop(1, COL.bg2);
-  g.fillStyle = lg;
+  g.fillStyle = COL.field;
   g.fillRect(view.left, top, fieldW, h);
-  g.fillStyle = "rgba(220,228,255,0.08)";
+  g.fillStyle = COL.line;
   for (let i = 0; i <= LANES; i++) g.fillRect(view.left + i * lw - 0.5, 0, 1, h);
 
   // beams
@@ -849,18 +843,17 @@ function draw() {
     game.beams[lane] = Math.max(held ? 0.32 : 0, game.beams[lane] - 0.05);
     const a = game.beams[lane];
     if (a <= 0.01) continue;
-    const bg = g.createLinearGradient(0, jy, 0, jy - h * 0.45);
-    bg.addColorStop(0, withAlpha(LANE_COLORS[lane], a));
-    bg.addColorStop(1, withAlpha(LANE_COLORS[lane], 0));
-    g.fillStyle = bg;
-    g.fillRect(view.left + lane * lw, jy - h * 0.45, lw, h * 0.45);
+    g.fillStyle = withAlpha(COL.fg, a * 0.35);
+    g.fillRect(view.left + lane * lw + 1, jy - h * 0.35, lw - 2, h * 0.35);
   }
 
   // judge line
-  g.fillStyle = "rgba(160,220,255,0.12)";
+  g.fillStyle = "rgba(255,255,255,0.05)";
   g.fillRect(view.left, jy - 14, fieldW, 28);
-  g.fillStyle = "rgba(235,245,255,0.95)";
-  g.fillRect(view.left, jy - 1.5, fieldW, 3);
+  g.fillStyle = COL.fg;
+  g.fillRect(view.left, jy - 1, fieldW, 2);
+  // tick marks at lane edges on the judge line
+  for (let i = 0; i <= LANES; i++) g.fillRect(view.left + i * lw - 1, jy - 8, 2, 16);
 
   // notes
   const pps = pxPerSec();
@@ -881,20 +874,16 @@ function draw() {
     if (isHold(n)) {
       const bw = lw * 0.6;
       const by = Math.min(ty, hy);
-      g.fillStyle = withAlpha(color, n.state === "holding" ? 0.6 : 0.42);
-      rr(x - bw / 2, by, bw, Math.max(0, hy - ty), 6);
-      g.fill();
-      g.fillStyle = withAlpha(color, 0.9);
-      rr(x - lw * 0.36, ty - nh * 0.3, lw * 0.72, nh * 0.6, 4);
-      g.fill();
+      g.fillStyle = withAlpha(color, n.state === "holding" ? 0.45 : 0.28);
+      g.fillRect(x - bw / 2, by, bw, Math.max(0, hy - ty));
+      g.fillStyle = color;
+      g.fillRect(x - lw * 0.36, ty - nh * 0.25, lw * 0.72, nh * 0.5);
     }
     if (hy > -nh && hy < h + nh) {
       g.fillStyle = color;
-      rr(x - lw * 0.45, hy - nh / 2, lw * 0.9, nh, 6);
-      g.fill();
-      g.fillStyle = "rgba(255,255,255,0.55)";
-      rr(x - lw * 0.38, hy - nh / 2 + 2, lw * 0.76, nh * 0.28, 3);
-      g.fill();
+      g.fillRect(x - lw * 0.45, hy - nh / 2, lw * 0.9, nh);
+      g.fillStyle = COL.bg;
+      g.fillRect(x - lw * 0.45, hy - 1, lw * 0.9, 2); // center slit
     }
     g.globalAlpha = 1;
   }
@@ -906,10 +895,8 @@ function draw() {
     const k = (nowMs - e.at) / 300;
     const r = lw * (0.25 + 0.3 * (1 - (1 - k) * (1 - k)));
     g.strokeStyle = withAlpha(e.color, 1 - k);
-    g.lineWidth = 4 * (1 - k) + 1;
-    g.beginPath(); g.arc(laneX(e.lane), jy, r, 0, Math.PI * 2); g.stroke();
-    g.fillStyle = withAlpha(e.color, 0.25 * (1 - k));
-    g.fill();
+    g.lineWidth = 3 * (1 - k) + 1;
+    g.strokeRect(laneX(e.lane) - r, jy - r, r * 2, r * 2);
   }
 
   drawHud(t);
@@ -921,28 +908,28 @@ function drawHud(t) {
   // progress
   g.fillStyle = "rgba(255,255,255,0.08)";
   g.fillRect(0, 0, w, 4);
-  g.fillStyle = COL.cyan;
+  g.fillStyle = COL.fg;
   g.fillRect(0, 0, w * Math.max(0, Math.min(1, t / game.endAt)), 4);
 
   const padL = Math.max(16, view.left > 70 ? 20 : 16);
   g.textBaseline = "top";
   g.textAlign = "left";
   g.fillStyle = COL.fg;
-  g.font = `700 26px ${C("--font-display")}`;
+  g.font = `900 24px ${C("--font-display")}`;
   g.fillText(String(s.score).padStart(7, "0"), padL, 18);
   g.fillStyle = COL.dim;
-  g.font = `700 13px ${C("--font-body")}`;
-  g.fillText(`${s.accuracy.toFixed(2)}%  ·  ${game.song.title}  ${game.chart.difficulty}`, padL, 52);
+  g.font = `400 13px ${C("--font-mono")}`;
+  g.fillText(`${s.accuracy.toFixed(2)}%  //  ${game.song.title.toUpperCase()}  ${game.chart.difficulty}`, padL, 52);
 
   g.textAlign = "center";
   if (s.combo >= 2) {
     g.textBaseline = "alphabetic";
     g.fillStyle = withAlpha(COL.fg, 0.92);
-    g.font = `800 ${Math.round(Math.min(64, w * 0.15))}px ${C("--font-display")}`;
+    g.font = `900 ${Math.round(Math.min(60, w * 0.14))}px ${C("--font-display")}`;
     g.fillText(String(s.combo), w / 2, h * 0.36);
     g.fillStyle = COL.dim;
-    g.font = `800 12px ${C("--font-body")}`;
-    g.fillText("C O M B O", w / 2, h * 0.36 + 20);
+    g.font = `400 12px ${C("--font-mono")}`;
+    g.fillText("// COMBO", w / 2, h * 0.36 + 22);
   }
 
   const jd = game.judge;
@@ -957,12 +944,12 @@ function drawHud(t) {
       g.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
       g.textBaseline = "middle";
       g.fillStyle = J_COLORS[jd.j];
-      g.font = `800 ${Math.round(Math.min(40, w * 0.095))}px ${C("--font-display")}`;
+      g.font = `900 ${Math.round(Math.min(34, w * 0.085))}px ${C("--font-display")}`;
       g.fillText(J_NAMES[jd.j], 0, 0);
       if (jd.j !== J.PERFECT && jd.j !== J.MISS && Number.isFinite(jd.delta)) {
-        g.fillStyle = jd.delta < 0 ? COL.cyan : COL.pink;
-        g.font = `800 13px ${C("--font-body")}`;
-        g.fillText(jd.delta < 0 ? "FAST" : "SLOW", 0, 32);
+        g.fillStyle = COL.dim;
+        g.font = `400 13px ${C("--font-mono")}`;
+        g.fillText(jd.delta < 0 ? "<< FAST" : "SLOW >>", 0, 30);
       }
       g.restore();
     }
@@ -970,15 +957,15 @@ function drawHud(t) {
 
   if (t < -0.2 && game.state === "playing") {
     g.textBaseline = "middle";
-    g.fillStyle = COL.cyan;
-    g.font = `800 96px ${C("--font-display")}`;
+    g.fillStyle = COL.fg;
+    g.font = `900 88px ${C("--font-display")}`;
     g.fillText(String(Math.ceil(-t)), w / 2, h * 0.45);
   }
 
   if (matchMedia("(pointer: fine)").matches) {
     g.textBaseline = "middle";
     g.fillStyle = withAlpha(COL.fg, 0.35);
-    g.font = `800 14px ${C("--font-body")}`;
+    g.font = `400 14px ${C("--font-mono")}`;
     ["D", "F", "J", "K"].forEach((k, i) => g.fillText(k, laneX(i), view.judgeY + 36));
   }
 }
@@ -1089,26 +1076,20 @@ function finishSong() {
   const rank = rankOf(s.score);
   $("resSong").innerHTML = "";
   $("resSong").append(`${game.song.title} · `);
-  const dspan = document.createElement("span");
-  dspan.style.color = DIFF_COLORS[c.difficulty] || COL.violet;
-  dspan.textContent = `${c.difficulty} Lv.${c.level}`;
-  $("resSong").append(dspan);
+  $("resSong").append(`${c.difficulty} Lv.${c.level}`);
   $("resRank").textContent = rank;
-  $("resRank").style.color = rank.startsWith("S") ? COL.gold : rank === "A" ? COL.cyan : COL.fg;
-  const clear = s.allPerfect ? ["ALL PERFECT", COL.gold] : s.fullCombo ? ["FULL COMBO", COL.cyan] : ["CLEAR", COL.fg];
-  $("resClear").textContent = clear[0];
-  $("resClear").style.color = clear[1];
+  $("resClear").textContent = s.allPerfect ? "[ ALL PERFECT ]" : s.fullCombo ? "[ FULL COMBO ]" : "[ CLEAR ]";
   $("resScore").textContent = s.score.toLocaleString("en-US");
-  $("resBest").textContent = newBest ? "NEW BEST" : `BEST ${prev.toLocaleString("en-US")}`;
+  $("resBest").textContent = newBest ? "// NEW RECORD ARCHIVED" : `// BEST ${prev.toLocaleString("en-US")}`;
   const rows = [
-    ["PERFECT", s.counts[J.PERFECT], COL.gold], ["GREAT", s.counts[J.GREAT], COL.cyan],
-    ["GOOD", s.counts[J.GOOD], COL.green], ["MISS", s.counts[J.MISS], COL.red],
+    ["PERFECT", s.counts[J.PERFECT]], ["GREAT", s.counts[J.GREAT]],
+    ["GOOD", s.counts[J.GOOD]], ["MISS", s.counts[J.MISS]],
     ["MAX COMBO", s.maxCombo], ["FAST / SLOW", `${s.fast} / ${s.slow}`],
   ];
   const dl = $("resStats");
   dl.replaceChildren();
-  for (const [k, v, col] of rows) {
-    const dt = document.createElement("dt"); dt.textContent = k; if (col) dt.style.color = col;
+  for (const [k, v] of rows) {
+    const dt = document.createElement("dt"); dt.textContent = k;
     const dd = document.createElement("dd"); dd.textContent = v;
     dl.append(dt, dd);
   }
@@ -1133,6 +1114,7 @@ const menu = (() => {
       b.type = "button"; b.className = "song";
       b.setAttribute("aria-pressed", String(s === song));
       const disc = document.createElement("span"); disc.className = "disc";
+      disc.textContent = String(SONGS.indexOf(s) + 1).padStart(2, "0");
       const meta = document.createElement("span"); meta.className = "meta";
       const tt = document.createElement("span"); tt.className = "t"; tt.textContent = s.title;
       const a = document.createElement("span"); a.className = "a"; a.textContent = `${s.artist} · ${s.bpm} BPM`;
@@ -1147,7 +1129,6 @@ const menu = (() => {
     song.charts.forEach((c, i) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "diff";
-      b.style.setProperty("--c", DIFF_COLORS[c.difficulty] || COL.violet);
       b.setAttribute("aria-pressed", String(i === chartIdx));
       const n = document.createElement("span"); n.className = "n"; n.textContent = c.difficulty;
       const lv = document.createElement("span"); lv.className = "lv"; lv.textContent = `Lv.${c.level}`;
@@ -1159,7 +1140,7 @@ const menu = (() => {
     const best = store.get(bestKey(song.id, c.difficulty), 0);
     $("bestLine").textContent = best > 0
       ? `BEST ${best.toLocaleString("en-US")} (${rankOf(best)}) · ${c.notes.length} notes`
-      : `No record yet · ${c.notes.length} notes`;
+      : `No record · ${c.notes.length} notes`;
     $("speedVal").textContent = settings.speed.toFixed(1);
     const off = settings.offsetMs;
     $("offVal").textContent = `${off > 0 ? "+" : ""}${off} ms`;
@@ -1212,7 +1193,7 @@ const calib = (() => {
     const bp = t / BEAT, idx = Math.floor(bp), ph = bp - idx;
     const s = t < 0 ? 0.8 : 1.15 - 0.35 * Math.min(1, ph * 2.5);
     pulse.style.transform = `scale(${s})`;
-    pulse.style.borderColor = idx >= 0 && idx < COUNT_IN ? COL.pink : COL.cyan;
+    pulse.style.borderColor = idx >= 0 && idx < COUNT_IN ? COL.dim : COL.fg;
     status.textContent = idx < COUNT_IN ? (t < 0 ? "Get ready…" : `Count-in ${idx + 1}`) : `Taps ${deltas.length} / ${NEED}`;
     if (deltas.length >= NEED || t > TOTAL * BEAT + 0.3) finish();
   }
