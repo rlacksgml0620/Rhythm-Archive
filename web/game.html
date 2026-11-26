@@ -932,6 +932,24 @@ function rr(x, y, w, h, r) {
   g.arcTo(x, y, x + w, y, r);
   g.closePath();
 }
+// Diagonal hatch used for hold-note bodies (one cached pattern per color).
+const hatchCache = new Map();
+function hatchPattern(color) {
+  const key = color + "@" + view.dpr;
+  if (hatchCache.has(key)) return hatchCache.get(key);
+  const size = Math.round(14 * view.dpr);
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const x = c.getContext("2d");
+  x.strokeStyle = color;
+  x.lineWidth = 3 * view.dpr;
+  x.beginPath();
+  for (let o = -size; o <= size; o += size) { x.moveTo(o, size); x.lineTo(o + size, 0); }
+  x.stroke();
+  const p = g.createPattern(c, "repeat");
+  hatchCache.set(key, p);
+  return p;
+}
 function withAlpha(hex, a) {
   const h = hex.replace("#", "");
   const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
@@ -1093,14 +1111,33 @@ function draw() {
     const color = LANE_COLORS[n.lane];
     g.globalAlpha = dim ? 0.35 : 1;
     if (isHold(n)) {
-      const bw = lw * 0.7;
-      const by = Math.min(ty, hy);
-      g.fillStyle = withAlpha(color, n.state === "holding" ? 0.45 : 0.28);
-      g.fillRect(x - bw / 2, by, bw, Math.max(0, hy - ty));
+      // Hold: railed body with diagonal hatching, hollow head, short tail cap.
+      const holding = n.state === "holding";
+      const bw = lw * 0.72, bx = x - bw / 2, bh = Math.max(0, hy - ty);
+      g.fillStyle = withAlpha(color, holding ? 0.16 : 0.08);
+      g.fillRect(bx, ty, bw, bh);
+      const pat = hatchPattern(color);
+      if (pat.setTransform) pat.setTransform(new DOMMatrix([1, 0, 0, 1, 0, ty * view.dpr]).scale(1 / view.dpr));
+      g.save();
+      g.globalAlpha *= holding ? 0.9 : 0.55;
+      g.fillStyle = pat;
+      g.fillRect(bx, ty, bw, bh);
+      g.restore();
       g.fillStyle = color;
-      g.fillRect(x - lw * 0.36, ty - nh * 0.25, lw * 0.72, nh * 0.5);
-    }
-    if (hy > -nh && hy < h + nh) {
+      g.fillRect(bx, ty, 3, bh);
+      g.fillRect(bx + bw - 3, ty, 3, bh);
+      g.fillRect(x - lw * 0.42, ty - 3, lw * 0.84, 6); // tail cap
+      if (hy > -nh && hy < h + nh) {
+        const hw = lw * 0.94, hx = x - hw / 2;
+        g.fillStyle = COL.bg;
+        g.fillRect(hx, hy - nh / 2, hw, nh);
+        g.fillStyle = withAlpha(color, holding ? 0.5 : 0.22);
+        g.fillRect(hx, hy - nh / 2, hw, nh);
+        g.strokeStyle = color;
+        g.lineWidth = 4;
+        g.strokeRect(hx + 2, hy - nh / 2 + 2, hw - 4, nh - 4);
+      }
+    } else if (hy > -nh && hy < h + nh) {
       g.fillStyle = color;
       g.fillRect(x - lw * 0.47, hy - nh / 2, lw * 0.94, nh);
       g.fillStyle = COL.bg;
