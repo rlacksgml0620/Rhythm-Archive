@@ -27,6 +27,8 @@
   --sel-ink: var(--ink);
   --flash: var(--fg);
   --glow: transparent;
+  --overlay: rgba(0, 0, 0, 0.92);
+  --overlay-soft: rgba(0, 0, 0, 0.62);
   color-scheme: dark;
 }
 /* Boss skins (unlocked by achievements). VOID VIOLET: ARCHIVE BREAKER. CRIMSON ZERO: ZERO ERRORS. */
@@ -60,6 +62,7 @@
   --bg: #f2f2f2; --panel: #e8e8e8; --field: #ebebeb; --line: #cfcfcf; --line-strong: #8a8a8a;
   --fg: #0a0a0a; --dim: #5e5e5e; --mute: #a3a3a3; --ink: #f2f2f2;
   --accent: #0a0a0a; --accent2: #4a4a4a; --sel: #0a0a0a; --sel-ink: #f2f2f2; --flash: #0a0a0a; --glow: transparent;
+  --overlay: rgba(242, 242, 242, 0.94); --overlay-soft: rgba(242, 242, 242, 0.7);
   color-scheme: light;
 }
 :root[data-skin="root"] {
@@ -124,7 +127,7 @@ button:disabled { opacity: 0.3; cursor: default; }
   -webkit-overflow-scrolling: touch;
 }
 .screen.solid { background: var(--bg); }
-.screen.dim { background: rgba(0, 0, 0, 0.92); justify-content: center; align-items: center; }
+.screen.dim { background: var(--overlay); justify-content: center; align-items: center; }
 .col { width: 100%; max-width: 460px; margin-inline: auto; display: flex; flex-direction: column; gap: 18px; }
 
 .brand { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
@@ -352,7 +355,7 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
 .toggle button.test { min-width: 0; color: var(--dim); }
 
 /* ---- finale (after the last note) ---- */
-.finale { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.62);
+.finale { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--overlay-soft);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .finale-inner { width: 100%; max-width: 520px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .finale-line { height: 2px; width: 0; background: var(--sel); animation: f-line 0.5s 0.05s cubic-bezier(.2,.8,.2,1) forwards; }
