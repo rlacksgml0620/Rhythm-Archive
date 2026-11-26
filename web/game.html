@@ -279,7 +279,16 @@ button:disabled { opacity: 0.3; cursor: default; }
 .songlist .song .a { font-size: 10px; letter-spacing: 0.06em; }
 .songlist .song.empty { opacity: 0.32; cursor: default; }
 .detail { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-.detail-title { display: flex; flex-direction: column; gap: 2px; }
+.detail-title { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; }
+.detail-title .t, .detail-title .a { grid-column: 1; }
+.record { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: 9px; }
+.medal { width: 15px; height: 15px; transform: rotate(45deg); border: 2px solid #f2f2f2; box-shadow: 0 0 0 1px #0a0a0a, inset 0 0 0 1px #0a0a0a; background: transparent; margin: 3px; }
+.medal.clear { background: #f2f2f2; }
+.medal.fc { background: #ffd23f; border-color: #ffd23f; }
+.medal.ap { border-color: #ffffff; background: conic-gradient(#ff4d4d, #ffb23f, #fff23f, #4dff6a, #3fd8ff, #6a5cff, #e04dff, #ff4d4d); animation: rainbow 3s linear infinite; }
+@keyframes rainbow { to { filter: hue-rotate(360deg); } }
+.record .grade { font-family: var(--font-display); font-weight: 900; font-size: 18px; letter-spacing: 0.04em; min-width: 2.2em; text-align: left; font-variant-numeric: tabular-nums; }
+.record .grade.none { color: var(--mute); }
 .detail-title .t { font-family: var(--font-display); font-weight: 900; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; overflow-wrap: anywhere; }
 .detail-title .a { font-size: 11px; letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; }
 .preview-box { flex: 1; min-height: 170px; position: relative; border: 1px solid var(--line); background: var(--field); }
@@ -430,6 +439,7 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
         <div class="detail-title">
           <span class="t" id="detailTitle"></span>
           <span class="a" id="detailMeta"></span>
+          <span class="record" id="detailRecord" aria-live="polite"><i class="medal" id="recMedal"></i><span class="grade none" id="recGrade">—</span></span>
         </div>
         <div class="preview-box">
           <canvas id="previewCanvas" aria-label="Chart preview"></canvas>
@@ -603,11 +613,11 @@ const C = (n) => css.getPropertyValue(n).trim();
 const COL = { skin: "mono" };
 // What each skin adds on the playfield.
 const SKIN_FX = {
-  mono: {},
-  invert: {},
-  violet: { glow: true, fx: "sigil", banner: ["BREACH", "// VOID PROTOCOL ONLINE"] },
-  crimson: { glow: true, fx: "hazard", banner: ["WARNING", "// ZERO PROTOCOL ENGAGED"] },
-  root: { glow: true, fx: "matrix", banner: ["ACCESS GRANTED", "// ROOT SHELL OPEN"] },
+  mono: { combo: { ap: "#ffffff", fc: "#bdbdbd" } },
+  invert: { combo: { ap: "#000000", fc: "#3a3a3a" } },
+  violet: { glow: true, fx: "sigil", banner: ["BREACH", "// VOID PROTOCOL ONLINE"], combo: { ap: "#ffd9ff", fc: "#b46bff" } },
+  crimson: { glow: true, fx: "hazard", banner: ["WARNING", "// ZERO PROTOCOL ENGAGED"], combo: { ap: "#ffd166", fc: "#ff2b3e" } },
+  root: { glow: true, fx: "matrix", banner: ["ACCESS GRANTED", "// ROOT SHELL OPEN"], combo: { ap: "#f2fff5", fc: "#39ff6a" } },
 };
 const fxOf = () => SKIN_FX[COL.skin] || {};
 const LANE_COLORS = [], J_COLORS = [];
@@ -3189,13 +3199,20 @@ function drawHud(t) {
 
   g.textAlign = "center";
   if (s.combo >= 2) {
+    // Combo marker: colour and label show whether an all perfect / full combo is still alive.
+    const c = s.counts, pal = fxOf().combo || SKIN_FX.mono.combo;
+    const ap = c[J.GREAT] + c[J.GOOD] + c[J.BAD] + c[J.MISS] === 0;
+    const fc = c[J.BAD] + c[J.MISS] === 0;
+    const col = ap ? pal.ap : fc ? pal.fc : COL.dim;
     g.textBaseline = "alphabetic";
-    g.fillStyle = withAlpha(COL.fg, 0.92);
+    g.fillStyle = col;
+    if (ap && fxOf().glow) { g.shadowColor = col; g.shadowBlur = 18; }
     g.font = `900 ${Math.round(Math.min(84, view.laneW * 0.7))}px ${C("--font-display")}`;
     g.fillText(String(s.combo), w / 2, h * 0.36);
-    g.fillStyle = COL.dim;
+    g.shadowBlur = 0;
+    g.fillStyle = ap || fc ? col : COL.dim;
     g.font = `400 12px ${C("--font-mono")}`;
-    g.fillText("// COMBO", w / 2, h * 0.36 + 22);
+    g.fillText(ap ? "// ALL PERFECT" : fc ? "// FULL COMBO" : "// COMBO", w / 2, h * 0.36 + 22);
   }
 
   const jd = game.judge;
@@ -3931,6 +3948,14 @@ const menu = (() => {
     });
     const c = song.charts[chartIdx];
     const best = store.get(bestKey(song.id, c.difficulty), 0);
+    // record medal: empty / clear (white) / full combo (yellow) / all perfect (rainbow)
+    const recs = store.get("records", { clears: {}, fcs: {}, aps: {} }), D = DIFFS.indexOf(c.difficulty);
+    const has = (map) => ((map || {})[song.id] || []).includes(D);
+    const medal = has(recs.aps) ? "ap" : has(recs.fcs) ? "fc" : has(recs.clears) || best >= CLEAR_SCORE ? "clear" : "";
+    $("recMedal").className = "medal" + (medal ? " " + medal : "");
+    $("detailRecord").setAttribute("aria-label", medal === "ap" ? "All perfect" : medal === "fc" ? "Full combo" : medal ? "Cleared" : "Not cleared");
+    $("recGrade").textContent = best > 0 ? rankOf(best) : "—";
+    $("recGrade").className = best > 0 ? "grade" : "grade none";
     $("bestLine").textContent = best > 0
       ? `BEST ${best.toLocaleString("en-US")} (${rankOf(best)}) · ${c.notes.length} notes`
       : `No record · ${c.notes.length} notes`;
