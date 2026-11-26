@@ -554,6 +554,12 @@ input[type="range"]:focus-visible { outline: 1px solid var(--fg); outline-offset
         <button type="button" class="btn" id="calibBtn">Auto sync calibration</button>
       </div>
 
+      <div class="group">
+        <span class="label">Archive data</span>
+        <button type="button" class="btn" id="unlockAllBtn">Unlock all achievements</button>
+        <button type="button" class="btn" id="resetAchvBtn">Reset achievements</button>
+      </div>
+
       <button type="button" class="btn primary" id="settingsBack" style="height:56px;font-size:16px;letter-spacing:0.24em">BACK</button>
     </div>
   </section>
@@ -3743,6 +3749,31 @@ const achievements = (() => {
   $("achvBtn").addEventListener("click", () => { render(); setScreen("achv"); screens.achv.scrollTop = 0; });
   $("achvBack").addEventListener("click", () => { setScreen("home"); render(); });
   const skinName = (id) => (SKINS.find((x) => x.id === id) || SKINS[0]).name;
+  function unlockAll() {
+    const got = unlockedMap();
+    LIST.forEach((a) => { got[a.id] = got[a.id] || Date.now(); });
+    store.set("achievements", got);
+    render();
+    toast(`${LIST.length} / ${LIST.length}`, "// ALL ACHIEVEMENTS AND SKINS UNLOCKED");
+  }
+  function resetAll() {
+    store.set("achievements", {});
+    store.set("records", { plays: 0, hits: 0, clears: {}, fcs: {}, aps: {} });
+    applySkin("mono");
+    render();
+    toast("ACHIEVEMENTS RESET", "// ARCHIVE DATA");
+  }
+  // Two taps to confirm, so a stray tap does nothing.
+  const confirmTap = (btn, label, action) => {
+    let armed = null;
+    btn.addEventListener("click", () => {
+      if (armed) { clearTimeout(armed); armed = null; btn.textContent = label; action(); return; }
+      btn.textContent = "Tap again to confirm";
+      armed = setTimeout(() => { armed = null; btn.textContent = label; }, 3000);
+    });
+  };
+  confirmTap($("unlockAllBtn"), "Unlock all achievements", unlockAll);
+  confirmTap($("resetAchvBtn"), "Reset achievements", resetAll);
   return { record, unlock, render, applySkin, skinName };
 })();
 
