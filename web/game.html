@@ -277,7 +277,7 @@ button:disabled { opacity: 0.3; cursor: default; }
 const LANES = 4;
 const SR = 44100;
 // Judgement windows (seconds, either side of the note). Outside BAD = MISS.
-const WIN = { perfect: 0.035, great: 0.070, good: 0.105, bad: 0.140 };
+const WIN = { perfect: 0.050, great: 0.090, good: 0.125, bad: 0.160 };
 const J = { PERFECT: 0, GREAT: 1, GOOD: 2, BAD: 3, MISS: 4 };
 const J_NAMES = ["PERFECT", "GREAT", "GOOD", "BAD", "MISS"];
 const J_WEIGHT = [1, 0.75, 0.4, 0.1, 0];
