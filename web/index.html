@@ -2861,7 +2861,7 @@ function rr(x, y, w, h, r) {
 // Boss-skin backdrop: a vignette that pulses on every beat, plus a rotating sigil (violet)
 // or scrolling hazard stripes (crimson).
 const matrix = { cols: null, w: 0, last: 0 };
-const GLYPHS = "01アイウエオカキクケコサシスセソタチツテト0123456789ABCDEF<>/#$";
+const GLYPHS = "0110100111010010"; // binary only
 function skinBackdrop(t) {
   const fx = fxOf();
   if (!fx.fx) return;
