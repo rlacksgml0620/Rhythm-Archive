@@ -3256,8 +3256,12 @@ function drawHud(t) {
   if (cd > -0.5 && game.state === "playing") {
     g.textBaseline = "middle";
     g.fillStyle = cd > 0 ? COL.fg : withAlpha(COL.fg, Math.max(0, 1 + cd / 0.5));
-    g.font = `900 88px ${C("--font-display")}`;
-    g.fillText(cd > 0 ? String(Math.ceil(cd)) : "GO", w / 2, h * 0.45);
+    g.font = `900 ${cd > 0 ? 88 : Math.round(Math.min(56, w * 0.115))}px ${C("--font-display")}`;
+    g.fillText(cd > 0 ? String(Math.ceil(cd)) : "PLAYBACK", w / 2, h * 0.45);
+    if (cd <= 0) {
+      g.font = `400 12px ${C("--font-mono")}`;
+      g.fillText("// RECORD OPEN", w / 2, h * 0.45 + 40);
+    }
   }
 
   if (matchMedia("(pointer: fine)").matches) {
